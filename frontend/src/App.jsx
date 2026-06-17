@@ -51,7 +51,7 @@ function App() {
   // Pulling state arrays dynamically from Python server
   const refreshPortfolioData = () => {
     setLoading(true)
-    fetch('http://127.0.0.1:5000/api/portfolio/data')
+    fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/data')
       .then(res => res.json())
       .then(data => {
         setBackendData(data)
@@ -90,7 +90,7 @@ function App() {
   // Action: Validate Admin Credentials parameters via backend
   const executeLoginSubmit = (e) => {
     e.preventDefault()
-    fetch('http://127.0.0.1:5000/api/auth/login', {
+    fetch('https://salik-portfolio-backend.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -110,7 +110,7 @@ function App() {
   // Action: Submit updated headers profile data nodes
   const handleCoreSubmit = (e) => {
     e.preventDefault()
-    fetch('http://127.0.0.1:5000/api/portfolio/update-core', {
+    fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-core', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(coreForm)
@@ -128,7 +128,7 @@ function App() {
   // Action: Submit external social anchor channels links
   const handleSocialsSubmit = (e) => {
     e.preventDefault()
-    fetch('http://127.0.0.1:5000/api/portfolio/update-socials', {
+    fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-socials', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(socialForm)
@@ -146,7 +146,7 @@ function App() {
   // Action: Append new array item node securely
   const handleItemSubmit = (e) => {
     e.preventDefault()
-    fetch(`http://127.0.0.1:5000/api/portfolio/item/${itemForm.category}`, {
+    fetch(`https://salik-portfolio-backend.onrender.com/api/portfolio/item/${itemForm.category}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(itemForm)
@@ -173,7 +173,7 @@ function App() {
   // Action: Delete custom tracking asset components
   const handleDeleteNode = (category, id) => {
     if(!window.confirm("Purge selected data node permanently from network registry?")) return
-    fetch(`http://127.0.0.1:5000/api/portfolio/item/${category}/${id}`, { method: 'DELETE' })
+    fetch(`https://salik-portfolio-backend.onrender.com/api/portfolio/item/${category}/${id}`, { method: 'DELETE' })
     .then(res => res.json())
     .then(resData => { if(resData.success) refreshPortfolioData() })
     .catch(err => console.error(err))
@@ -187,7 +187,7 @@ function App() {
     setChatHistory(prev => [...prev, userMsg])
     setIsAiTyping(true)
 
-    fetch('http://127.0.0.1:5000/api/rag/chat', {
+    fetch('https://salik-portfolio-backend.onrender.com/api/rag/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: questionText })
