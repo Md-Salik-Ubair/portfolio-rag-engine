@@ -1,21 +1,19 @@
-# Master Core Matrix Factory for Md Salik Ubair's AI Engine
 from flask import Flask
 from flask_cors import CORS
 
 def create_app():
-    """
-    Initializes the system engine instance, applies cross-origin policies,
-    and mounts separate decoupled blueprints securely.
-    """
     app = Flask(__name__)
     
-    # Standard security layer to talk with the React dashboard port smoothly
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Strictly configure CORS to allow your Vercel frontend domain
+    # Replace 'https://portfolio-salik-live.vercel.app' with your actual production URL
+    CORS(app, resources={r"/api/*": {"origins": [
+        "https://portfolio-salik-live.vercel.app", 
+        "http://localhost:5173" # Keep this for local testing
+    ]}}, supports_credentials=True)
     
-    # Ensuring standard linear order for programmatic payloads
     app.config['JSON_SORT_KEYS'] = False
 
-    # Blueprints registration sector
+    # Blueprints registration
     from app.routes.auth import auth_bp
     from app.routes.portfolio import portfolio_bp
     from app.routes.rag import rag_bp
@@ -26,6 +24,6 @@ def create_app():
 
     @app.route('/health', methods=['GET'])
     def system_status():
-        return {"status": "healthy", "architecture": "Strict Blank Blueprint Core 2026"}, 200
+        return {"status": "healthy", "architecture": "Strict Persistent Blueprint Core 2026"}, 200
 
     return app
