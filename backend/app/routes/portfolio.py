@@ -1,5 +1,6 @@
-# Production Portfolio Data Routers linked with Blank Blueprint Grid
+# Production Portfolio Data Routers linked with MongoDB Core
 from flask import Blueprint, jsonify, request
+from app.services.storage_service import update_family_meta
 from app.services.storage_service import (
     get_complete_portfolio, 
     insert_dynamic_item, 
@@ -12,18 +13,18 @@ portfolio_bp = Blueprint('portfolio', __name__)
 
 @portfolio_bp.route('/data', methods=['GET'])
 def fetch_portfolio_state():
-    """Serves the absolute blank core matrix to the frontend components."""
+    """Serves the complete master state network from MongoDB to the frontend components."""
     return jsonify(get_complete_portfolio()), 200
 
 @portfolio_bp.route('/update-core', methods=['POST'])
 def edit_profile_core_headers():
-    """Updates the core identity block (Full Name, Title, Location, Summary, Status)."""
+    """Updates the core identity block (Full Name, Title, Location, Summary, Status, Phone, WhatsApp)."""
     try:
         data = request.get_json() or {}
         updated_core = update_profile_core(data)
         return jsonify({
             "success": True,
-            "message": "Core profile metrics updated inside blank blueprint.",
+            "message": "Core profile metrics updated successfully in database.",
             "data": updated_core
         }), 200
     except Exception as e:
@@ -46,7 +47,7 @@ def edit_social_channels():
 @portfolio_bp.route('/item/<category>', methods=['POST'])
 def create_portfolio_node(category):
     """
-    Appends full length nodes dynamically to arrays.
+    Appends full length nodes dynamically to MongoDB arrays.
     Valid targets: experiences, projects, education, certifications_and_achievements
     """
     try:
@@ -72,7 +73,7 @@ def create_portfolio_node(category):
 
 @portfolio_bp.route('/item/<category>/<int:item_id>', methods=['DELETE'])
 def remove_portfolio_node(category, item_id):
-    """Removes any asset node safely by searching its unique generation identifier."""
+    """Removes any asset node safely by searching its unique generation identifier in MongoDB."""
     try:
         valid_grids = ["experiences", "projects", "education", "certifications_and_achievements"]
         if category not in valid_grids:
@@ -80,7 +81,7 @@ def remove_portfolio_node(category, item_id):
             
         is_cleared = remove_dynamic_item(category, item_id)
         if not is_cleared:
-            return jsonify({"success": False, "error": "Target node node not found or mismatch."}), 404
+            return jsonify({"success": False, "error": "Target node not found or mismatch."}), 404
             
         return jsonify({
             "success": True,
@@ -88,3 +89,16 @@ def remove_portfolio_node(category, item_id):
         }), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+@portfolio_bp.route('/update-family', methods=['POST'])
+def edit_family_matrix():
+    """Updates the family background section."""
+    try:
+        data = request.get_json() or {}
+        updated_meta = update_family_meta(data)
+        return jsonify({
+            "success": True,
+            "message": "Family background matrix updated successfully.",
+            "data": updated_meta
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500    

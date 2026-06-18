@@ -1,80 +1,123 @@
-import json
-import os
 import time
+from pymongo import MongoClient
 
-# Define the persistent storage path
-STORAGE_FILE = "portfolio_data.json"
+# ==========================================
+# MONGODB CLOUD DATABASE CONNECTION
+# ==========================================
+# Yahan in double quotes ke andar apni MongoDB wali URL paste kar
+MONGO_URI = "YAHAN_APNI_COPIED_URL_PASTE_KAR"
 
-# Initialize file if it doesn't exist
-def initialize_storage():
-    if not os.path.exists(STORAGE_FILE):
-        default_data = {
-            "profile_core": {"full_name": "", "professional_title": "", "location": "", "profile_summary": "", "current_status": ""},
-            "social_channels": {"email": "", "linkedin": "", "github": "", "instagram": ""},
-            "education": [],
-            "experiences": [],
-            "projects": [],
-            "certifications_and_achievements": [],
-            "family_meta": {"summary": ""}
-        }
-        with open(STORAGE_FILE, "w") as f:
-            json.dump(default_data, f)
+client = MongoClient(MONGO_URI)
+db = client["salik_portfolio"]
+collection = db["master_data"]
 
-initialize_storage()
+# Initial Professional Schema with Phone & WhatsApp
+DEFAULT_STATE = {
+    "_id": "global_state",
+    "profile_core": {
+        "full_name": "", 
+        "professional_title": "", 
+        "location": "",
+        "profile_summary": "", 
+        "current_status": "",
+        "phone_number": "",      # NEW: Phone Number
+        "whatsapp_link": ""      # NEW: WhatsApp Link
+    },
+    "social_channels": {
+        "email": "", 
+        "linkedin": "", 
+        "github": "", 
+        "instagram": ""
+    },
+    "education": [],
+    "experiences": [],
+    "projects": [],
+    "certifications_and_achievements": [],
+    "family_meta": {"summary": ""}
+}
 
-def load_data():
-    with open(STORAGE_FILE, "r") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(STORAGE_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+def _get_document():
+    """Fetches the master document from MongoDB, creates it if missing."""
+    doc = collection.find_one({"_id": "global_state"})
+    if not doc:
+        collection.insert_one(DEFAULT_STATE)
+        return DEFAULT_STATE
+    return doc
 
 def get_complete_portfolio():
-    return load_data()
+    """Returns the absolute master state network to the frontend router."""
+    doc = _get_document()
+    doc.pop('_id', None) # Remove MongoDB specific ID for clean JSON
+    return doc
 
 def update_profile_core(payload):
-    data = load_data()
-    core = data["profile_core"]
-    for key in ["full_name", "professional_title", "location", "profile_summary", "current_status"]:
+    """Refines top-level core details including Phone and WhatsApp."""
+    doc = _get_document()
+    core = doc.get("profile_core", {})
+    
+    fields_to_update = ["full_name", "professional_title", "location", "profile_summary", "current_status", "phone_number", "whatsapp_link"]
+    for key in fields_to_update:
         if key in payload:
             core[key] = payload[key]
-    save_data(data)
+            
+    collection.update_one({"_id": "global_state"}, {"$set": {"profile_core": core}})
     return core
 
 def update_social_channels(payload):
-    data = load_data()
-    socials = data["social_channels"]
+    """Directly maps and secures external anchor links."""
+    doc = _get_document()
+    socials = doc.get("social_channels", {})
+    
     for key in ["email", "linkedin", "github", "instagram"]:
         if key in payload:
             socials[key] = payload[key]
-    save_data(data)
+            
+    collection.update_one({"_id": "global_state"}, {"$set": {"social_channels": socials}})
     return socials
 
-def insert_dynamic_item(category, payload):
-    data = load_data()
-    if category not in data:
-        return None
+def update_family_meta(payload):
+    """Secures and updates the family background matrix."""
+    doc = _get_document()
+    meta = doc.get("family_meta", {})
     
+    if "summary" in payload:
+        meta["summary"] = payload["summary"]
+        
+    collection.update_one({"_id": "global_state"}, {"$set": {"family_meta": meta}})
+    return meta
+
+def insert_dynamic_item(category, payload):
+    """Appends full-length dictionary nodes to structural arrays in MongoDB."""
+    valid_categories = ["experiences", "projects", "education", "certifications_and_achievements"]
+    if category not in valid_categories:
+        return None
+        
     item_structure = {
         "id": int(time.time()),
         "title": payload.get("title") or payload.get("degree"),
         "organization_or_issuer": payload.get("organization_or_issuer") or payload.get("institution"),
         "duration_or_date": payload.get("duration_or_date"),
         "description": payload.get("description", ""),
-        "tag_or_skills_mapped": payload.get("tag_or_skills_mapped", ""),
-        "external_redirection_link": payload.get("external_redirection_link", None)
+        "score_or_credential_id": payload.get("score_or_credential_id", ""), 
+        "tag_or_skills_mapped": payload.get("tag_or_skills_mapped", ""),       
+        "image_url": payload.get("image_url", None),        
+        "external_redirection_link": payload.get("external_redirection_link", None) 
     }
     
-    data[category].append(item_structure)
-    save_data(data)
+    collection.update_one(
+        {"_id": "global_state"},
+        {"$push": {category: item_structure}}
+    )
     return item_structure
 
 def remove_dynamic_item(category, item_id):
-    data = load_data()
-    if category not in data:
+    """Targets and purges a clean data node via its unique execution stamp."""
+    valid_categories = ["experiences", "projects", "education", "certifications_and_achievements"]
+    if category not in valid_categories:
         return False
-    initial_count = len(data[category])
-    data[category] = [item for item in data[category] if item["id"] != int(item_id)]
-    save_data(data)
-    return len(data[category]) < initial_count
+        
+    result = collection.update_one(
+        {"_id": "global_state"},
+        {"$pull": {category: {"id": int(item_id)}}}
+    )
+    return result.modified_count > 0
