@@ -83,14 +83,32 @@ function App() {
 
   const handleProfileSubmit = (e) => {
     e.preventDefault();
+    
+    // Optional: Alert user that process has started
+    alert("Initiating Data Transfer... Please wait up to 50 seconds if the server is waking up.");
+
     fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-core', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileForm)
-    }).then(res => res.json()).then(resData => {
+    })
+    .then(res => res.json())
+    .then(resData => {
       if (resData.success) {
+        // Save Family Data
         fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-family', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: profileForm.family_narrative })
-        }).then(() => { alert("Profile saved successfully."); refreshPortfolioData(); });
+        })
+        .then(res => res.json())
+        .then(() => { 
+            alert("✅ Profile Core & Background Matrix saved successfully in MongoDB."); 
+            refreshPortfolioData(); 
+        })
+        .catch(err => alert("⚠️ Family data link failed: " + err));
+      } else {
+        alert("❌ Core update failed: " + resData.error);
       }
+    })
+    .catch(err => {
+        alert("⚠️ Backend Connection Delayed. Render server might be waking up. Try again in 30 seconds. Error: " + err);
     });
   };
 
