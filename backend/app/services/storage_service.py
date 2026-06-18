@@ -21,7 +21,9 @@ DEFAULT_STATE = {
         "profile_summary": "", 
         "current_status": "",
         "phone_number": "",      # NEW: Phone Number
-        "whatsapp_link": ""      # NEW: WhatsApp Link
+        "whatsapp_link": "",
+        "skills_list": "",
+        "languages_known": ""   # NEW: WhatsApp Link
     },
     "social_channels": {
         "email": "", 
@@ -55,7 +57,7 @@ def update_profile_core(payload):
     doc = _get_document()
     core = doc.get("profile_core", {})
     
-    fields_to_update = ["full_name", "professional_title", "location", "profile_summary", "current_status", "phone_number", "whatsapp_link"]
+    fields_to_update = ["full_name", "professional_title", "location", "profile_summary", "current_status", "phone_number", "whatsapp_link", "skills_list", "languages_known"]
     for key in fields_to_update:
         if key in payload:
             core[key] = payload[key]
