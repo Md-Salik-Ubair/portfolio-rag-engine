@@ -18,10 +18,10 @@ const FloatingBackButton = () => {
   return (
     <button 
       onClick={handleBack}
-      className="fixed top-4 left-4 z-50 bg-slate-900/80 backdrop-blur-md text-white p-2.5 rounded-full border border-slate-700 shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200"
+      className="fixed top-4 left-4 z-50 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full border border-slate-700 shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200 text-sm font-bold flex items-center gap-1"
       aria-label="Go Back"
     >
-      <ArrowLeft size={20} className="text-cyan-400" />
+      ← <span className="text-xs font-medium text-cyan-400">Back</span>
     </button>
   );
 };
