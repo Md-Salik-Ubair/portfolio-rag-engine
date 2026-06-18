@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown'; 
+// ArrowLeft icon use karne ke liye import kiya hai
+import { ArrowLeft } from 'lucide-react'; 
 
+// ==========================================
+// FLOATING BACK BUTTON COMPONENT
+// ==========================================
+const FloatingBackButton = () => {
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = "https://portfolio-salik-live.vercel.app";
+    }
+  };
+
+  return (
+    <button 
+      onClick={handleBack}
+      className="fixed top-4 left-4 z-50 bg-slate-900/80 backdrop-blur-md text-white p-2.5 rounded-full border border-slate-700 shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200"
+      aria-label="Go Back"
+    >
+      <ArrowLeft size={20} className="text-cyan-400" />
+    </button>
+  );
+};
+
+// ==========================================
+// MAIN APP COMPONENT
+// ==========================================
 function App() {
   const [currentView, setCurrentView] = useState('portfolio'); 
   const [backendData, setBackendData] = useState(null);
@@ -38,7 +66,7 @@ function App() {
     fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/data')
       .then(res => res.json())
       .then(data => {
-        if (data && !data.error) { // Added error check from backend
+        if (data && !data.error) {
           setBackendData(data);
           setProfileForm({
             full_name: data.profile_core?.full_name || '',
@@ -83,8 +111,6 @@ function App() {
 
   const handleProfileSubmit = (e) => {
     e.preventDefault();
-    
-    // Optional: Alert user that process has started
     alert("Initiating Data Transfer... Please wait up to 50 seconds if the server is waking up.");
 
     fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-core', {
@@ -93,7 +119,6 @@ function App() {
     .then(res => res.json())
     .then(resData => {
       if (resData.success) {
-        // Save Family Data
         fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-family', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: profileForm.family_narrative })
         })
@@ -165,6 +190,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#000000] text-slate-100 font-sans antialiased selection:bg-sky-500/20 relative">
+      {/* FLOATING BACK BUTTON RENDERED HERE FOR GLOBAL OVERLAY */}
+      <FloatingBackButton />
+
       <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-sky-500/5 rounded-full blur-[150px] pointer-events-none" />
 
       {/* NAVBAR */}
@@ -188,7 +216,6 @@ function App() {
           
           /* VIEW 1: PREMIUM PORTFOLIO */
           <div className="space-y-12 animate-fadeIn">
-            
             {/* HERO SECTION */}
             <div className="border border-slate-800 bg-slate-900/20 rounded-3xl p-8 md:p-12 space-y-8 backdrop-blur-sm shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 left-0 w-2 h-full bg-sky-500" />
@@ -245,9 +272,9 @@ function App() {
               </div>
             </div>
 
-            {/* DYNAMIC LISTS (Only render if items exist) */}
+            {/* DYNAMIC LISTS */}
             {['experiences', 'projects', 'education', 'certifications_and_achievements'].map((sec) => {
-              if (!backendData || !backendData[sec] || backendData[sec].length === 0) return null; // Hide empty sections completely
+              if (!backendData || !backendData[sec] || backendData[sec].length === 0) return null;
               
               const displayTitle = sec.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               return (
@@ -272,7 +299,7 @@ function App() {
                     ))}
                   </div>
                 </div>
-              )
+              );
             })}
 
             {/* FAMILY BACKGROUND */}
@@ -308,7 +335,6 @@ function App() {
           /* VIEW 3: ADMIN HUB */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
             <div className="lg:col-span-1 space-y-8">
-              
               <div className="border border-slate-800 bg-slate-900/20 rounded-3xl p-6 space-y-6">
                 <h2 className="text-lg font-bold text-white">Profile Control</h2>
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
@@ -357,7 +383,6 @@ function App() {
                       <option value="certifications_and_achievements">Credentials & Awards</option>
                     </select>
                   </div>
-                  {/* Inputs for Item Form */}
                   <div className="space-y-1.5"><label className="text-xs font-medium text-slate-400">Primary Title</label><input type="text" value={itemForm.title} required onChange={(e) => setItemForm({...itemForm, title: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500" /></div>
                   <div className="space-y-1.5"><label className="text-xs font-medium text-slate-400">Organization / Issuer</label><input type="text" value={itemForm.organization_or_issuer} onChange={(e) => setItemForm({...itemForm, organization_or_issuer: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500" /></div>
                   <div className="space-y-1.5"><label className="text-xs font-medium text-slate-400">Timeline (e.g. May 2023 - Present)</label><input type="text" value={itemForm.duration_or_date} onChange={(e) => setItemForm({...itemForm, duration_or_date: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500" /></div>
@@ -416,7 +441,6 @@ function App() {
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-none shadow-md' : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none'}`}>
-                    {/* Safe Markdown Rendering. If tailwind typography fails, base styles hold it up */}
                     {msg.role === 'user' ? msg.text : <ReactMarkdown className="markdown-body font-sans text-sm prose-p:mb-2 prose-ul:list-disc prose-ul:ml-4 prose-strong:text-white prose-strong:font-bold prose-headings:text-sky-400 prose-headings:font-bold prose-headings:mb-2">{msg.text}</ReactMarkdown>}
                   </div>
                 </div>
