@@ -1,25 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown'; 
 // ArrowLeft icon use karne ke liye import kiya hai
-import { ArrowLeft } from 'lucide-react'; 
+// import { ArrowLeft } from 'lucide-react'; 
 
-// ==========================================
-// FLOATING BACK BUTTON COMPONENT
-// ==========================================
 const FloatingBackButton = () => {
   const handleBack = () => {
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      window.location.href = "https://portfolio-salik-live.vercel.app";
+      window.location.href = "https://portfolio-salik-live.vercel.app/";
     }
   };
 
   return (
     <button 
       onClick={handleBack}
-      className="fixed top-4 left-4 z-50 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full border border-slate-700 shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200 text-sm font-bold flex items-center gap-1"
-      aria-label="Go Back"
+      className="fixed top-4 left-4 z-50 bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full border border-slate-700 shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200 text-sm font-bold flex items-center gap-1"
+      style={{ position: 'fixed', top: '16px', left: '16px', zIndex: 9999 }}
     >
       ← <span className="text-xs font-medium text-cyan-400">Back</span>
     </button>
