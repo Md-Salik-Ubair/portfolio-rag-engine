@@ -5,7 +5,7 @@ from pymongo import MongoClient
 # MONGODB CLOUD DATABASE CONNECTION
 # ==========================================
 # Yahan in double quotes ke andar apni MongoDB wali URL paste kar
-MONGO_URI = "YAHAN_APNI_COPIED_URL_PASTE_KAR"
+MONGO_URI = "mongodb+srv://mdsalikubair_db_user:qpuEyEGtyP47GuQW@cluster0.dqkp05g.mongodb.net/?appName=Cluster0"
 
 client = MongoClient(MONGO_URI)
 db = client["salik_portfolio"]
