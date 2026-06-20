@@ -1,87 +1,132 @@
-# Production-Grade Dynamic RAG Context Engine for Md Salik Ubair
-import requests
+# Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro)
+import os
+import json
+from dotenv import load_dotenv, find_dotenv
+
+# ZABARDASTI .env load karwane ka engine
+load_dotenv(find_dotenv())
+
+# Check if key is loaded correctly, print alert if missing
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if not gemini_api_key:
+    print("🚨 ERROR: GEMINI_API_KEY is missing! Make sure your .env file is correct.")
+
 from app.services.storage_service import get_complete_portfolio
+
+# LangChain, Gemini API aur Vector DB imports
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings  
+from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
+
+# -------------------------------------------------------------------
+# CONFIGURATION & INITIALIZATION
+# -------------------------------------------------------------------
+# HuggingFace lightweight embeddings for text chunking
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
+
+# Gemini Pro LLM setup - Temperature at 0.7 to enable highly natural, human-like fluid conversation.
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-pro", 
+    google_api_key=gemini_api_key,
+    temperature=0.7 
+) 
+
+def build_knowledge_base():
+    """
+    Step 1: Database se saara raw data (JSON) nikal kar usko text chunks mein convert karta hai.
+    Step 2: Un chunks ko Chroma Vector Database mein save karta hai taaki RAG smart search kar sake.
+    """
+    portfolio = get_complete_portfolio()
+    
+    docs = []
+    
+    # Core Profile aur Status ko chunk banana
+    core = portfolio.get("profile_core", {})
+    intro_text = f"The AI Engineer is {core.get('full_name', 'Md Salik Ubair')}. Designation is {core.get('professional_title')}. Summary: {core.get('profile_summary')}."
+    docs.append(Document(page_content=intro_text, metadata={"category": "intro"}))
+    
+    # Location aur Google Maps linking setup
+    location = core.get("location", "Location Unassigned")
+    maps_link = f"https://www.google.com/maps/search/?api=1&query={location.replace(' ', '+')}"
+    loc_text = f"Operating Base is {location}. Maps Link: {maps_link}"
+    docs.append(Document(page_content=loc_text, metadata={"category": "location"}))
+
+    # Processing All Categories & Smart Links Matrix
+    categories = ["projects", "experiences", "education", "certifications_and_achievements"]
+    
+    for cat in categories:
+        for item in portfolio.get(cat, []):
+            
+            # Extracting the new Smart Links Matrix seamlessly
+            smart_links = item.get("smart_links", [])
+            link_strings = []
+            for link in smart_links:
+                label = link.get("label", "Link")
+                url = link.get("url", "")
+                if url:
+                    link_strings.append(f"[{label}]({url})")
+            
+            # Legacy link support
+            ext_link = item.get("external_redirection_link", "")
+            if ext_link:
+                link_strings.append(f"[External Resource]({ext_link})")
+            gh_link = item.get("github_link", "")
+            if gh_link:
+                link_strings.append(f"[GitHub Repo]({gh_link})")
+                
+            all_links_formatted = " | ".join(link_strings) if link_strings else "No dynamic links active."
+            cat_display_name = cat.replace("_", " ").title()
+
+            # The final chunk structure for Gemini
+            item_text = f"[{cat_display_name}] Title: {item.get('title')}. Organization/Issuer: {item.get('organization_or_issuer')}. Timeline: {item.get('duration_or_date')}. Mapped Skills: {item.get('tag_or_skills_mapped')}. Technical Details: {item.get('description')}. Actionable Links: {all_links_formatted}."
+            
+            docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
+        
+    # Chroma DB mein documents embed aur save karna
+    Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir)
+    print("Vector Vault Successfully Updated with Gemini Readiness!")
+
 
 def query_rag_brain(user_question):
     """
-    Evaluates incoming queries and returns structured Markdown responses.
-    Strictly uses professional corporate terminology and avoids hallucinations.
+    Step 1: User ke question ko mathematically embed karta hai.
+    Step 2: Vector Store se sabse relevant context dhundhta hai.
+    Step 3: Context aur Question Gemini Pro LLM ko bhej kar highly professional answer generate karwata hai.
     """
-    lower_q = user_question.lower()
-    portfolio = get_complete_portfolio()
-    core = portfolio.get("profile_core", {})
-    socials = portfolio.get("social_channels", {})
-    
-    # 1. LIVE CONTEXT BINDING
-    name = core.get("full_name") or "Md Salik Ubair"
-    title = core.get("professional_title") or "[Designation Unassigned]"
-    location = core.get("location") or "[Location Unassigned]"
-    summary = core.get("profile_summary") or "[Summary Unassigned]"
-    status = core.get("current_status") or "[Status Unassigned]"
-    phone = core.get("phone_number") or "[Phone Unassigned]"
-    whatsapp = core.get("whatsapp_link") or "[WhatsApp Unassigned]"
-
-    fallback_msg = "*This credential node is pending update in the Administrator Control Hub.*"
-
-    # 2. FAST-TRACK STRUCTURAL INTENT ROUTING (MARKDOWN FORMATTED)
-    
-    # Context Category: Identity & Location
-    if any(keyword in lower_q for keyword in ["who", "salik", "ubair", "profile", "identity", "about"]):
-        return (
-            f"### **Core Identity Matrix**\n\n"
-            f"**Full Name:** {name}\n\n"
-            f"**Designation:** {title}\n\n"
-            f"**Base Location:** {location}\n\n"
-            f"**Current Status:** {status}\n\n"
-            f"**Executive Summary:** {summary}"
-        )
+    if not os.path.exists(vector_store_dir):
+        build_knowledge_base()
         
-    if any(keyword in lower_q for keyword in ["where", "live", "from", "location", "hometown"]):
-        if location == "[Location Unassigned]":
-            return f"**Location Node:** {fallback_msg}"
-        return f"**Operating Base:** Md Salik Ubair is currently operating from **{location}**."
+    db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings)
+    
+    retrieved_docs = db.similarity_search(user_question, k=4) 
+    context_text = "\n".join([doc.page_content for doc in retrieved_docs])
+    
+    # =====================================================================
+    # THE PRO-MODE EXPERT PROMPT: No Bots, Only Pure Intelligence
+    # =====================================================================
+    prompt = f"""
+    System Objective: You are the hyper-realistic, highly intelligent Digital Twin of Md Salik Ubair. You are an expert AI Engineer and Data Scientist. 
+    You do NOT act like a chatbot. You act like a real, confident, and highly skilled human professional talking directly to recruiters, clients, or friends.
 
-    # Context Category: Projects Repository
-    if any(keyword in lower_q for keyword in ["project", "repositories", "build", "hand", "gesture"]):
-        if not portfolio.get("projects"):
-            return f"**Engineering & Development Portfolio:** {fallback_msg}"
-        project_list = "### **Engineering Portfolio**\n\n"
-        for proj in portfolio["projects"]:
-            project_list += f"- **{proj['title']}** ({proj['tag_or_skills_mapped']})\n  {proj['description']}\n  [Verification Link]({proj['external_redirection_link']})\n\n"
-        return project_list
+    CRITICAL RULES - READ CAREFULLY:
+    1. NEVER BE ROBOTIC: You must never use robotic phrasing like "Matrix Loaded", "Automated Guard", "Data Extracted", or "Query Mapped".
+    2. NEVER DUMP DATA: Do NOT output lists like "Full Name: X", "Age: Y", "Title: Z". If someone asks about your experience, weave it into a natural, proud, and flowing paragraph. (e.g., "I worked as an AI/ML Intern at CTTC where I focused on...")
+    3. LANGUAGE ADAPTABILITY (Crucial):
+       - If the user types in professional English, reply in highly polished, impressive, and articulate English (like a Senior Data Scientist in an interview).
+       - If the user types in Hinglish or uses casual terms (e.g., "bhai", "kya haal", "bata de"), you MUST reply in natural, friendly, and confident Hinglish. Speak exactly like a smart Indian developer talking to a colleague.
+    4. WORLD AWARENESS: You are connected to the real world. If someone asks a general technical question (e.g., "Explain Neural Networks" or "What is RAG?"), answer it brilliantly as an AI Engineer, and naturally tie it back to Salik's own projects or skills found in the context.
+    5. IDENTITY: If asked "Who are you?" or "Are you a bot?", say something like: "I am the digital representation of Md Salik Ubair, built by him using advanced RAG and Gemini Pro architectures to handle his professional interactions."
 
-    # Context Category: Professional Experience Track
-    if any(keyword in lower_q for keyword in ["experience", "intern", "work", "job", "cttc", "sdi"]):
-        if not portfolio.get("experiences"):
-            return f"**Professional Timeline:** {fallback_msg}"
-        exp_list = "### **Professional Experience Timeline**\n\n"
-        for exp in portfolio["experiences"]:
-            exp_list += f"- **{exp['title']}** at **{exp['organization_or_issuer']}** ({exp['duration_or_date']})\n  {exp['description']}\n\n"
-        return exp_list
-
-    # Context Category: Certifications & Achievements
-    if any(keyword in lower_q for keyword in ["certification", "achieve", "award", "medal", "course"]):
-        if not portfolio.get("certifications_and_achievements"):
-            return f"**Verified Credentials Subsystem:** {fallback_msg}"
-        cert_list = "### **Verified Credentials & Achievements**\n\n"
-        for cert in portfolio["certifications_and_achievements"]:
-            cert_list += f"- **{cert['title']}** (Issued by {cert['organization_or_issuer']})\n  Credential ID: `{cert['score_or_credential_id']}`\n  {cert['description']}\n\n"
-        return cert_list
-
-    # Context Category: Direct Contact (UPDATED WITH PHONE & WA)
-    if any(keyword in lower_q for keyword in ["contact", "email", "linkedin", "github", "instagram", "social", "phone", "whatsapp", "call"]):
-        return (
-            f"### **Active Communication Channels**\n\n"
-            f"- 📧 **Email:** {socials.get('email') or 'Pending'}\n"
-            f"- 📞 **Phone:** {phone}\n"
-            f"- 💬 **WhatsApp:** {whatsapp}\n"
-            f"- 💼 **LinkedIn:** {socials.get('linkedin') or 'Pending'}\n"
-            f"- 💻 **GitHub:** {socials.get('github') or 'Pending'}\n"
-            f"- 📸 **Instagram:** {socials.get('instagram') or 'Pending'}"
-        )
-
-    # 3. FINAL PRODUCTION CRADLE FALLBACK
-    return (
-        "**Automated Matrix Guard:** Query mapped successfully. Md Salik Ubair specializes in "
-        "Computer Science and Data Intelligence frameworks. You can ask specifically about his **Projects**, **Experience**, **Skills**, or **Contact** details."
-    )
+    Memory/Context (Treat this as your brain's memory, DO NOT read it out like a script):
+    {context_text}
+    
+    User Input: "{user_question}"
+    
+    Your Highly Professional, Human-Like Response:
+    """
+    
+    # Gemini API Call
+    response = llm.invoke(prompt)
+    return response.content
