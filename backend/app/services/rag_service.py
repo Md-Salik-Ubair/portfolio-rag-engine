@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro)
+# Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro/Flash)
 import os
 import json
 import logging
@@ -50,9 +50,9 @@ vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# Main LLM
+# Main LLM - Shifted to Ultra-Fast and Stable Flash Model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro", 
+    model="gemini-1.5-flash", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
