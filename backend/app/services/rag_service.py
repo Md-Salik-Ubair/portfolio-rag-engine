@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro/Flash)
+# Production-Grade Dynamic RAG Context Engine (Powered by Gemini 1.5 Flash)
 import os
 import json
 import logging
@@ -43,7 +43,7 @@ from langchain_core.documents import Document
 # -------------------------------------------------------------------
 # CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-# FIX: Using Google's LATEST correct embedding model name to avoid 404
+# Using Google's LATEST correct embedding model name
 embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
@@ -51,9 +51,8 @@ vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
 # Main LLM - Shifted to Ultra-Fast and Stable Flash Model
-# FIX: Shifted to the base, universally supported Gemini Pro model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro",  # <--- Bas '1.5-flash' hata kar 'gemini-pro' likhna hai
+    model="gemini-1.5-flash", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
