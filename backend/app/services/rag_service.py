@@ -1,18 +1,23 @@
 # Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro)
 import os
 import json
-from dotenv import load_dotenv, find_dotenv
 
-# Telemetry Killer for ChromaDB
+# ==========================================
+# NUCLEAR OPTION: KILL CHROMADB TELEMETRY FIRST
+# ==========================================
+os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
+from dotenv import load_dotenv, find_dotenv
 from chromadb.config import Settings
 
 # ZABARDASTI .env load karwane ka engine
 load_dotenv(find_dotenv())
 
-# Double Safety for API Keys (Langchain sometimes forces GOOGLE_API_KEY)
+# Double Safety for API Keys
 gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if gemini_api_key:
-    os.environ["GOOGLE_API_KEY"] = gemini_api_key  # Override to ensure Langchain finds it
+    os.environ["GOOGLE_API_KEY"] = gemini_api_key  
 else:
     print("🚨 ERROR: GEMINI_API_KEY or GOOGLE_API_KEY is missing! Make sure your Render Env is set.")
 
@@ -31,12 +36,12 @@ from langchain_core.documents import Document
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
-# THE TELEMETRY ASSASSIN: Force disable tracking so it never crashes on Render
+# Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False)
 
-# Gemini Pro LLM setup - Temperature at 0.7 to enable highly natural, human-like fluid conversation.
+# FIX: Updated Google Model Name to the currently supported version
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro", 
+    model="gemini-1.5-pro-latest", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
