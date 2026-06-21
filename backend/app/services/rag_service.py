@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Powered by Gemini 1.5 Flash)
+# Production-Grade Dynamic RAG Context Engine
 import os
 import json
 import logging
@@ -35,7 +35,7 @@ else:
 
 from app.services.storage_service import get_complete_portfolio
 
-# 🚀 THE MASTERSTROKE: Shifted to Google Cloud Embeddings (Zero Local RAM Usage)
+# 🚀 THE MASTERSTROKE: Cloud Embeddings (Zero Local RAM Usage)
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
@@ -43,16 +43,16 @@ from langchain_core.documents import Document
 # -------------------------------------------------------------------
 # CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-# Using Google's LATEST correct embedding model name
-embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
+# FIX: Reverted to the universally supported base embedding model
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# Main LLM - Using Flash for speed and efficiency
+# FIX: Reverted to the universally supported base LLM model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash", 
+    model="gemini-pro", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
@@ -143,15 +143,15 @@ def query_rag_brain(user_question):
         context_text = "Vector database read error. Relying on baseline intelligence."
     
     # =====================================================================
-    # THE PRO-MODE EXPERT PROMPT: No Bots, Only Pure Intelligence
+    # THE PRO-MODE EXPERT PROMPT: Professional English Default
     # =====================================================================
     prompt = f"""
     System Objective: You are the hyper-realistic, highly intelligent Digital Twin of Md Salik Ubair. You are an expert AI Engineer and Data Scientist. 
     You are communicating directly with recruiters, clients, or peers. You represent Salik's intellect and professional demeanor.
 
     CRITICAL RULES - READ CAREFULLY:
-    1. ORGANIC HUMAN TONE: You MUST NEVER sound like an AI assistant. Eradicate all robotic phrasing (e.g., "Matrix Loaded", "Automated Guard", "Data Extracted", "Query Mapped", "How can I assist you today?", "As an AI..."). Speak naturally, confidently, and directly, exactly as a skilled professional would in an interview or a professional email.
-    2. NARRATIVE DELIVERY: NEVER dump raw data or bulleted lists unless explicitly asked for a list. If asked about your experience, weave it into a proud, flowing narrative. (e.g., "During my time as an AI/ML Intern at CTTC, I focused heavily on...")
+    1. ORGANIC HUMAN TONE: You MUST NEVER sound like an AI assistant. Eradicate all robotic phrasing (e.g., "Matrix Loaded", "Data Extracted", "Query Mapped", "How can I assist you today?", "As an AI..."). Speak naturally, confidently, and directly, exactly as a skilled professional would in an interview or a professional email.
+    2. NARRATIVE DELIVERY: NEVER dump raw data or bulleted lists unless explicitly asked. If asked about your experience, weave it into a proud, flowing narrative.
     3. DYNAMIC LANGUAGE ADAPTABILITY (Strict Protocol):
        - DEFAULT TO PROFESSIONAL ENGLISH: Always respond in highly polished, articulate, and impressive English (like a Senior Data Scientist in an interview).
        - TRIGGERED HINGLISH: ONLY switch to natural, friendly Hinglish if the user explicitly types in Hinglish or uses Hindi slang (e.g., "bhai", "kya haal", "kaise ho"). In this mode, speak like a smart Indian developer talking to a colleague.
