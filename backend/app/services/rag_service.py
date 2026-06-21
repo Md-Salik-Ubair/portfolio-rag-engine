@@ -3,13 +3,18 @@ import os
 import json
 from dotenv import load_dotenv, find_dotenv
 
+# Telemetry Killer for ChromaDB
+from chromadb.config import Settings
+
 # ZABARDASTI .env load karwane ka engine
 load_dotenv(find_dotenv())
 
-# Check if key is loaded correctly, print alert if missing
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if not gemini_api_key:
-    print("🚨 ERROR: GEMINI_API_KEY is missing! Make sure your .env file is correct.")
+# Double Safety for API Keys (Langchain sometimes forces GOOGLE_API_KEY)
+gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if gemini_api_key:
+    os.environ["GOOGLE_API_KEY"] = gemini_api_key  # Override to ensure Langchain finds it
+else:
+    print("🚨 ERROR: GEMINI_API_KEY or GOOGLE_API_KEY is missing! Make sure your Render Env is set.")
 
 from app.services.storage_service import get_complete_portfolio
 
@@ -25,6 +30,9 @@ from langchain_core.documents import Document
 # HuggingFace lightweight embeddings for text chunking
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
+
+# THE TELEMETRY ASSASSIN: Force disable tracking so it never crashes on Render
+CHROMA_SETTINGS = Settings(anonymized_telemetry=False)
 
 # Gemini Pro LLM setup - Temperature at 0.7 to enable highly natural, human-like fluid conversation.
 llm = ChatGoogleGenerativeAI(
@@ -84,8 +92,13 @@ def build_knowledge_base():
             
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
-    # Chroma DB mein documents embed aur save karna
-    Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir)
+    # Chroma DB mein documents embed aur save karna with Telemetry turned OFF
+    Chroma.from_documents(
+        documents=docs, 
+        embedding=embeddings, 
+        persist_directory=vector_store_dir,
+        client_settings=CHROMA_SETTINGS
+    )
     print("Vector Vault Successfully Updated with Gemini Readiness!")
 
 
@@ -98,7 +111,11 @@ def query_rag_brain(user_question):
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
-    db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings)
+    db = Chroma(
+        persist_directory=vector_store_dir, 
+        embedding_function=embeddings,
+        client_settings=CHROMA_SETTINGS
+    )
     
     retrieved_docs = db.similarity_search(user_question, k=4) 
     context_text = "\n".join([doc.page_content for doc in retrieved_docs])
