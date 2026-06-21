@@ -51,8 +51,9 @@ vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
 # Main LLM - Shifted to Ultra-Fast and Stable Flash Model
+# FIX: Shifted to the base, universally supported Gemini Pro model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash", 
+    model="gemini-pro",  # <--- Bas '1.5-flash' hata kar 'gemini-pro' likhna hai
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
