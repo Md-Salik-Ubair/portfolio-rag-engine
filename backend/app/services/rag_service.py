@@ -6,7 +6,6 @@ import logging
 # ==========================================
 # THE ASSASSIN PROTOCOL: MONKEY PATCHING CHROMADB TELEMETRY
 # ==========================================
-# We explicitly block posthog from being able to send data, even if Chroma tries to initialize it.
 os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 os.environ["POSTHOG_DISABLED"] = "1"
@@ -36,23 +35,21 @@ else:
 
 from app.services.storage_service import get_complete_portfolio
 
-# LangChain, Gemini API aur Vector DB imports
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceEmbeddings  
+# 🚀 THE MASTERSTROKE: Shifted to Google Cloud Embeddings (Zero Local RAM Usage)
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 
 # -------------------------------------------------------------------
 # CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-# HuggingFace lightweight embeddings for text chunking
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Using Google's embedding model to save Render's 512MB RAM limitation
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# FIX: Updated Google Model Name to the currently supported version (Removed '-latest')
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-pro", 
     google_api_key=gemini_api_key,
