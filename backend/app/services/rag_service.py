@@ -43,13 +43,14 @@ from langchain_core.documents import Document
 # -------------------------------------------------------------------
 # CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-# Using Google's embedding model to save Render's 512MB RAM limitation
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=gemini_api_key)
+# FIX: Using Google's LATEST correct embedding model name to avoid 404
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
+# Main LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-pro", 
     google_api_key=gemini_api_key,
