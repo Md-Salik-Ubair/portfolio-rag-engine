@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine
+# Production-Grade Dynamic RAG Context Engine (Optimized for New Google API Keys)
 import os
 import json
 import logging
@@ -43,27 +43,22 @@ from langchain_core.documents import Document
 # -------------------------------------------------------------------
 # CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-# FIX: Reverted to the universally supported base embedding model
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=gemini_api_key)
+# 🎯 FIX: Strictly using the latest embeddings supported by new AQ keys
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# FIX: Reverted to the universally supported base LLM model
+# 🎯 FIX: Strictly using the latest 1.5 Flash model supported by new AQ keys
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro", 
+    model="gemini-1.5-flash", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
 
 def build_knowledge_base():
-    """
-    Step 1: Extracts raw data (JSON) from the database and converts it into text chunks.
-    Step 2: Saves these chunks into the Chroma Vector Database for smart RAG searching.
-    """
     portfolio = get_complete_portfolio()
-    
     docs = []
     
     # Core Profile chunk creation
@@ -82,8 +77,6 @@ def build_knowledge_base():
     
     for cat in categories:
         for item in portfolio.get(cat, []):
-            
-            # Extracting the new Smart Links Matrix seamlessly
             smart_links = item.get("smart_links", [])
             link_strings = []
             for link in smart_links:
@@ -92,7 +85,6 @@ def build_knowledge_base():
                 if url:
                     link_strings.append(f"[{label}]({url})")
             
-            # Legacy link support
             ext_link = item.get("external_redirection_link", "")
             if ext_link:
                 link_strings.append(f"[External Resource]({ext_link})")
@@ -103,48 +95,27 @@ def build_knowledge_base():
             all_links_formatted = " | ".join(link_strings) if link_strings else "No dynamic links active."
             cat_display_name = cat.replace("_", " ").title()
 
-            # The final chunk structure for Gemini
             item_text = f"[{cat_display_name}] Title: {item.get('title')}. Organization/Issuer: {item.get('organization_or_issuer')}. Timeline: {item.get('duration_or_date')}. Mapped Skills: {item.get('tag_or_skills_mapped')}. Technical Details: {item.get('description')}. Actionable Links: {all_links_formatted}."
-            
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
-    # Embed and save documents into Chroma DB with Telemetry turned OFF
     try:
-        Chroma.from_documents(
-            documents=docs, 
-            embedding=embeddings, 
-            persist_directory=vector_store_dir,
-            client_settings=CHROMA_SETTINGS
-        )
+        Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir, client_settings=CHROMA_SETTINGS)
         print("Vector Vault Successfully Updated with Gemini Readiness!")
     except Exception as e:
         print(f"Error building vector DB: {e}")
 
 def query_rag_brain(user_question):
-    """
-    Step 1: Mathematically embeds the user's question.
-    Step 2: Finds the most relevant context from the Vector Store.
-    Step 3: Sends the context and question to the Gemini Pro LLM to generate a highly professional, persona-driven answer.
-    """
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
     try:
-        db = Chroma(
-            persist_directory=vector_store_dir, 
-            embedding_function=embeddings,
-            client_settings=CHROMA_SETTINGS
-        )
-        
+        db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
         retrieved_docs = db.similarity_search(user_question, k=4) 
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
         print(f"Chroma Read Error: {e}")
         context_text = "Vector database read error. Relying on baseline intelligence."
     
-    # =====================================================================
-    # THE PRO-MODE EXPERT PROMPT: Professional English Default
-    # =====================================================================
     prompt = f"""
     System Objective: You are the hyper-realistic, highly intelligent Digital Twin of Md Salik Ubair. You are an expert AI Engineer and Data Scientist. 
     You are communicating directly with recruiters, clients, or peers. You represent Salik's intellect and professional demeanor.
@@ -167,7 +138,6 @@ def query_rag_brain(user_question):
     Your Response:
     """
     
-    # Gemini API Call
     try:
         response = llm.invoke(prompt)
         return response.content
