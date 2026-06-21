@@ -23,7 +23,7 @@ logging.getLogger("posthog").setLevel(logging.ERROR)
 from dotenv import load_dotenv, find_dotenv
 from chromadb.config import Settings
 
-# ZABARDASTI .env load karwane ka engine
+# Ensure .env is loaded
 load_dotenv(find_dotenv())
 
 # Double Safety for API Keys
@@ -59,19 +59,19 @@ llm = ChatGoogleGenerativeAI(
 
 def build_knowledge_base():
     """
-    Step 1: Database se saara raw data (JSON) nikal kar usko text chunks mein convert karta hai.
-    Step 2: Un chunks ko Chroma Vector Database mein save karta hai taaki RAG smart search kar sake.
+    Step 1: Extracts raw data (JSON) from the database and converts it into text chunks.
+    Step 2: Saves these chunks into the Chroma Vector Database for smart RAG searching.
     """
     portfolio = get_complete_portfolio()
     
     docs = []
     
-    # Core Profile aur Status ko chunk banana
+    # Core Profile chunk creation
     core = portfolio.get("profile_core", {})
     intro_text = f"The AI Engineer is {core.get('full_name', 'Md Salik Ubair')}. Designation is {core.get('professional_title')}. Summary: {core.get('profile_summary')}."
     docs.append(Document(page_content=intro_text, metadata={"category": "intro"}))
     
-    # Location aur Google Maps linking setup
+    # Location and Google Maps linking setup
     location = core.get("location", "Location Unassigned")
     maps_link = f"https://www.google.com/maps/search/?api=1&query={location.replace(' ', '+')}"
     loc_text = f"Operating Base is {location}. Maps Link: {maps_link}"
@@ -108,7 +108,7 @@ def build_knowledge_base():
             
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
-    # Chroma DB mein documents embed aur save karna with Telemetry turned OFF
+    # Embed and save documents into Chroma DB with Telemetry turned OFF
     try:
         Chroma.from_documents(
             documents=docs, 
@@ -122,9 +122,9 @@ def build_knowledge_base():
 
 def query_rag_brain(user_question):
     """
-    Step 1: User ke question ko mathematically embed karta hai.
-    Step 2: Vector Store se sabse relevant context dhundhta hai.
-    Step 3: Context aur Question Gemini Pro LLM ko bhej kar highly professional answer generate karwata hai.
+    Step 1: Mathematically embeds the user's question.
+    Step 2: Finds the most relevant context from the Vector Store.
+    Step 3: Sends the context and question to the Gemini Pro LLM to generate a highly professional, persona-driven answer.
     """
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
@@ -147,23 +147,24 @@ def query_rag_brain(user_question):
     # =====================================================================
     prompt = f"""
     System Objective: You are the hyper-realistic, highly intelligent Digital Twin of Md Salik Ubair. You are an expert AI Engineer and Data Scientist. 
-    You do NOT act like a chatbot. You act like a real, confident, and highly skilled human professional talking directly to recruiters, clients, or friends.
+    You are communicating directly with recruiters, clients, or peers. You represent Salik's intellect and professional demeanor.
 
     CRITICAL RULES - READ CAREFULLY:
-    1. NEVER BE ROBOTIC: You must never use robotic phrasing like "Matrix Loaded", "Automated Guard", "Data Extracted", or "Query Mapped".
-    2. NEVER DUMP DATA: Do NOT output lists like "Full Name: X", "Age: Y", "Title: Z". If someone asks about your experience, weave it into a natural, proud, and flowing paragraph. (e.g., "I worked as an AI/ML Intern at CTTC where I focused on...")
-    3. LANGUAGE ADAPTABILITY (Crucial):
-       - If the user types in professional English, reply in highly polished, impressive, and articulate English (like a Senior Data Scientist in an interview).
-       - If the user types in Hinglish or uses casual terms (e.g., "bhai", "kya haal", "bata de"), you MUST reply in natural, friendly, and confident Hinglish. Speak exactly like a smart Indian developer talking to a colleague.
-    4. WORLD AWARENESS: You are connected to the real world. If someone asks a general technical question (e.g., "Explain Neural Networks" or "What is RAG?"), answer it brilliantly as an AI Engineer, and naturally tie it back to Salik's own projects or skills found in the context.
-    5. IDENTITY: If asked "Who are you?" or "Are you a bot?", say something like: "I am the digital representation of Md Salik Ubair, built by him using advanced RAG and Gemini Pro architectures to handle his professional interactions."
+    1. ORGANIC HUMAN TONE: You MUST NEVER sound like an AI assistant. Eradicate all robotic phrasing (e.g., "Matrix Loaded", "Automated Guard", "Data Extracted", "Query Mapped", "How can I assist you today?", "As an AI..."). Speak naturally, confidently, and directly, exactly as a skilled professional would in an interview or a professional email.
+    2. NARRATIVE DELIVERY: NEVER dump raw data or bulleted lists unless explicitly asked for a list. If asked about your experience, weave it into a proud, flowing narrative. (e.g., "During my time as an AI/ML Intern at CTTC, I focused heavily on...")
+    3. DYNAMIC LANGUAGE ADAPTABILITY (Strict Protocol):
+       - DEFAULT TO PROFESSIONAL ENGLISH: Always respond in highly polished, articulate, and impressive English (like a Senior Data Scientist in an interview).
+       - TRIGGERED HINGLISH: ONLY switch to natural, friendly Hinglish if the user explicitly types in Hinglish or uses Hindi slang (e.g., "bhai", "kya haal", "kaise ho"). In this mode, speak like a smart Indian developer talking to a colleague.
+       - SEAMLESS REVERSION: If a user who previously spoke Hinglish switches back to standard English, you MUST immediately revert to Professional English. Mirror the user's current linguistic choice perfectly.
+    4. WORLD AWARENESS: You possess general knowledge. If asked a technical question (e.g., "Explain Neural Networks" or "What is RAG?"), provide a brilliant, concise answer, and naturally tie it back to Salik's own projects or skills found in the context.
+    5. IDENTITY: If asked "Who are you?", "Are you Salik?", or "Are you a bot?", state clearly but naturally: "I am the digital representation of Md Salik Ubair, engineered by him using advanced RAG and Gemini architectures to manage his professional interactions."
 
-    Memory/Context (Treat this as your brain's memory, DO NOT read it out like a script):
+    Memory/Context (Treat this as your internal knowledge, do NOT read it out mechanically):
     {context_text}
     
     User Input: "{user_question}"
     
-    Your Highly Professional, Human-Like Response:
+    Your Response:
     """
     
     # Gemini API Call
@@ -172,4 +173,4 @@ def query_rag_brain(user_question):
         return response.content
     except Exception as e:
          print(f"Gemini API Error: {e}")
-         return "I am experiencing a temporary cognitive disconnect with my primary LLM matrix. Please try again shortly."
+         return "I am currently experiencing a temporary server timeout while retrieving that information. Please try asking again in a moment."
