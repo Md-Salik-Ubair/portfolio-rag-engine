@@ -50,12 +50,12 @@ vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 # Force disable tracking again via Settings
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# Main LLM - Shifted to Ultra-Fast and Stable Flash Model
+# Main LLM - Reverted to the universally supported base model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash", 
+    model="gemini-pro",  # <--- Bas 'gemini-1.5-flash' ko wapas 'gemini-pro' kar de
     google_api_key=gemini_api_key,
     temperature=0.7 
-) 
+)
 
 def build_knowledge_base():
     """
