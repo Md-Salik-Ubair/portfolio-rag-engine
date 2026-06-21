@@ -1,12 +1,25 @@
 # Production-Grade Dynamic RAG Context Engine (Powered by Gemini Pro)
 import os
 import json
+import logging
 
 # ==========================================
-# NUCLEAR OPTION: KILL CHROMADB TELEMETRY FIRST
+# THE ASSASSIN PROTOCOL: MONKEY PATCHING CHROMADB TELEMETRY
 # ==========================================
+# We explicitly block posthog from being able to send data, even if Chroma tries to initialize it.
 os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["POSTHOG_DISABLED"] = "1"
+
+try:
+    import posthog
+    posthog.disabled = True
+except ImportError:
+    pass
+
+# Suppress annoying warnings
+logging.getLogger("chromadb").setLevel(logging.ERROR)
+logging.getLogger("posthog").setLevel(logging.ERROR)
 
 from dotenv import load_dotenv, find_dotenv
 from chromadb.config import Settings
@@ -37,7 +50,7 @@ embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 
 # Force disable tracking again via Settings
-CHROMA_SETTINGS = Settings(anonymized_telemetry=False)
+CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
 # FIX: Updated Google Model Name to the currently supported version
 llm = ChatGoogleGenerativeAI(
@@ -98,13 +111,16 @@ def build_knowledge_base():
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
     # Chroma DB mein documents embed aur save karna with Telemetry turned OFF
-    Chroma.from_documents(
-        documents=docs, 
-        embedding=embeddings, 
-        persist_directory=vector_store_dir,
-        client_settings=CHROMA_SETTINGS
-    )
-    print("Vector Vault Successfully Updated with Gemini Readiness!")
+    try:
+        Chroma.from_documents(
+            documents=docs, 
+            embedding=embeddings, 
+            persist_directory=vector_store_dir,
+            client_settings=CHROMA_SETTINGS
+        )
+        print("Vector Vault Successfully Updated with Gemini Readiness!")
+    except Exception as e:
+        print(f"Error building vector DB: {e}")
 
 
 def query_rag_brain(user_question):
@@ -116,14 +132,18 @@ def query_rag_brain(user_question):
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
-    db = Chroma(
-        persist_directory=vector_store_dir, 
-        embedding_function=embeddings,
-        client_settings=CHROMA_SETTINGS
-    )
-    
-    retrieved_docs = db.similarity_search(user_question, k=4) 
-    context_text = "\n".join([doc.page_content for doc in retrieved_docs])
+    try:
+        db = Chroma(
+            persist_directory=vector_store_dir, 
+            embedding_function=embeddings,
+            client_settings=CHROMA_SETTINGS
+        )
+        
+        retrieved_docs = db.similarity_search(user_question, k=4) 
+        context_text = "\n".join([doc.page_content for doc in retrieved_docs])
+    except Exception as e:
+        print(f"Chroma Read Error: {e}")
+        context_text = "Vector database read error. Relying on baseline intelligence."
     
     # =====================================================================
     # THE PRO-MODE EXPERT PROMPT: No Bots, Only Pure Intelligence
@@ -150,5 +170,9 @@ def query_rag_brain(user_question):
     """
     
     # Gemini API Call
-    response = llm.invoke(prompt)
-    return response.content
+    try:
+        response = llm.invoke(prompt)
+        return response.content
+    except Exception as e:
+         print(f"Gemini API Error: {e}")
+         return "I am experiencing a temporary cognitive disconnect with my primary LLM matrix. Please try again shortly."
