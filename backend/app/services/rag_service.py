@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Universal Safe Mode)
+# Production-Grade Dynamic RAG Context Engine (Next-Gen Ecosystem)
 import os
 import json
 import logging
@@ -31,18 +31,22 @@ else:
 
 from app.services.storage_service import get_complete_portfolio
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 
+# 🎯 FIX 1: Using the newly mandated langchain_chroma import
+from langchain_chroma import Chroma 
+
 # -------------------------------------------------------------------
-# THE FIX: Universal Base Models (100% Guaranteed to bypass 404)
+# CONFIGURATION & INITIALIZATION
 # -------------------------------------------------------------------
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=gemini_api_key)
+# 🎯 FIX 2: Strictly using the latest 004 embeddings supported by new AQ keys
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
+# 🎯 FIX 3: Strictly using the latest 1.5 Flash model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro", 
+    model="gemini-1.5-flash", 
     google_api_key=gemini_api_key,
     temperature=0.7 
 ) 
