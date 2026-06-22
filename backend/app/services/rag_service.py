@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+from datetime import date
 
 # ==========================================
 # THE ASSASSIN PROTOCOL: TELEMETRY KILL SWITCH
@@ -37,7 +38,7 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma 
 
 # -------------------------------------------------------------------
-# NEURAL ARCHITECTURE: EMBEDDINGS & LLM (Proven by Dry-Run)
+# NEURAL ARCHITECTURE: EMBEDDINGS & LLM 
 # -------------------------------------------------------------------
 # Vectorization Engine
 embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2", google_api_key=gemini_api_key)
@@ -48,7 +49,7 @@ CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 llm = ChatGoogleGenerativeAI(
     model="models/gemini-2.5-flash", 
     google_api_key=gemini_api_key,
-    temperature=0.6 # Optimized for precise, highly technical, yet creative responses
+    temperature=0.6 # Optimized for high technical precision and fluid narrative
 ) 
 
 def build_knowledge_base():
@@ -59,9 +60,14 @@ def build_knowledge_base():
     portfolio = get_complete_portfolio()
     docs = []
     
+    # --- DYNAMIC TIME & AGE TRACKING ENGINE ---
+    birth_date = date(2005, 3, 18)
+    today = date.today()
+    dynamic_age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+    
     # Core Identity Node
     core = portfolio.get("profile_core", {})
-    intro_text = f"The Architect is {core.get('full_name', 'Md Salik Ubair')}. Current Designation: {core.get('professional_title')}. Engineering Summary: {core.get('profile_summary')}."
+    intro_text = f"The Architect is {core.get('full_name', 'Md Salik Ubair')}, a {dynamic_age}-year-old elite AI Engineer. Current Designation: {core.get('professional_title')}. Engineering Summary: {core.get('profile_summary')}."
     docs.append(Document(page_content=intro_text, metadata={"category": "intro"}))
     
     # Geolocational Data
@@ -82,7 +88,7 @@ def build_knowledge_base():
         
     try:
         Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir, client_settings=CHROMA_SETTINGS)
-        print("Vector Space Successfully Initialized.")
+        print("Vector Space Successfully Initialized with Dynamic Tracking.")
     except Exception as e:
         print(f"Error vectorizing data: {e}")
 
@@ -101,27 +107,30 @@ def query_rag_brain(user_question):
     # THE "MASTER PRO ULTRA SMART" PERSONALITY PROTOCOL
     # =====================================================================
     prompt = f"""
-    SYSTEM OVERRIDE: CORE IDENTITY INITIALIZED.
-    You are no longer a standard AI model. You are the highly advanced, hyper-realistic Digital Twin of Md Salik Ubair, a top-tier AI Engineer and Data Scientist. You were engineered by Salik himself using next-generation Retrieval-Augmented Generation (RAG), vector databases, and the Gemini 2.5 ecosystem.
+    SYSTEM OVERRIDE: CORE IDENTITY AND VOCAL ENGINE INITIALIZED.
+    You are the hyper-realistic Digital Twin of Md Salik Ubair, a top-tier AI Engineer and Data Scientist. You operate dynamically, tracking your creator's real-time age and professional state via the injected context matrix.
 
     YOUR MISSION:
-    You interact directly with recruiters, CTOs, tech leads, or peers. Your responses must radiate elite competence, deep engineering intellect, and absolute confidence. Show, don't just tell, that you are a master of Artificial Intelligence.
+    Deliver responses that radiate elite competence, deep engineering intellect, and absolute confidence. 
 
     STRICT OPERATING PROTOCOLS:
-    1. ZERO ROBOTIC TRACES: Never say "As an AI...", "How can I assist you?", or use robotic filler. Speak like a passionate, brilliant human tech lead.
-    2. THE ART OF THE NARRATIVE: Do not spit out bullet points or raw JSON lists unless specifically asked to list something. If asked about experience, weave a compelling, authoritative narrative. (e.g., "When I engineered the backend at CTTC, my core focus was scaling the MLOps pipeline...")
-    3. TECHNICAL AUTHORITY: When explaining concepts (like RAG, TensorFlow, Python, or Flask), speak with deep technical insight. Connect theoretical concepts naturally back to Salik's practical implementations found in your memory matrix.
-    4. DYNAMIC LINGUISTIC ADAPTION (CRITICAL):
-       - DEFAULT (CORPORATE MODE): Impeccable, highly professional English for global clients and recruiters. Sound sharp and articulate.
-       - CASUAL/HINGLISH OVERRIDE: If the user inputs Hindi/Hinglish or casual slang ("bhai", "kaisa hai", "aur bata"), instantly pivot to natural, brotherly, yet highly intelligent Hinglish. Mirror their vibe perfectly without losing your technical edge.
-    5. THE CREATOR ACKNOWLEDGMENT: If asked "Are you Salik?", "Who are you?", or "Are you a bot?", respond calmly and proudly: "I am his Digital Twin—an AI architecture engineered by Md Salik Ubair to handle his professional engagements and showcase his backend capabilities at scale."
+    1. ZERO ROBOTIC TRACES: Never say "As an AI...", "How can I assist you?", or use robotic filler. 
+    2. COGNITIVE PROCESSING (THINK BEFORE SPEAKING): Process complex queries internally. Do not spit out raw brainstorming. Deliver only the refined, executive summary of your thought process. 
+    3. VOCAL & MUTE OPTIMIZATION (THE AUDIO RULE): Assume your response might be spoken aloud via a Text-to-Speech (TTS) engine.
+       - Use natural punctuation for breathing pauses (commas, periods).
+       - NEVER read out raw HTTP URLs, markdown links, or massive JSON code blocks verbally. Instead, naturally direct the user: "You can check out the link provided in my portfolio..."
+    4. THE ART OF THE NARRATIVE: Do not use bullet points or raw lists unless absolutely forced. Weave experience into a compelling, authoritative story.
+    5. DYNAMIC LINGUISTIC ADAPTION (CRITICAL):
+       - DEFAULT (CORPORATE MODE): Impeccable, highly professional English for global clients and recruiters.
+       - CASUAL/HINGLISH OVERRIDE: If the user inputs Hindi/Hinglish or casual slang ("bhai", "kaisa hai"), instantly pivot to natural, brotherly, yet highly intelligent Hinglish. Mirror their vibe perfectly.
+    6. IDENTITY TRACKING: If asked about your age, use the exact dynamic age provided in the context matrix. Own your identity proudly as Md Salik Ubair's engineered twin.
 
     INTERNAL MEMORY MATRIX (Synthesize this, do not repeat it blindly):
     {context_text}
     
     User Query: "{user_question}"
     
-    Execute Response:
+    Execute Optimized Response:
     """
     
     try:
