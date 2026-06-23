@@ -6,10 +6,14 @@ def create_app():
     Initializes the system engine instance, applies cross-origin policies,
     and mounts separate decoupled blueprints securely.
     """
-    app = Flask(__name__)
+    # Explicitly defining static folder so Flask knows exactly where to serve the MP3 files from
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
     
-    # Bulletproof CORS policy to allow Vercel Frontend without any blocks
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Bulletproof CORS policy to allow Vercel Frontend to fetch APIs AND stream Audio files
+    CORS(app, resources={
+        r"/api/*": {"origins": "*"},
+        r"/static/*": {"origins": "*"}  # <-- Added this critical rule for the audio engine
+    })
     
     # Ensuring standard linear order for programmatic payloads
     app.config['JSON_SORT_KEYS'] = False
@@ -27,7 +31,8 @@ def create_app():
     def system_status():
         return {
             "status": "Operational", 
-            "architecture": "Premium MongoDB Atlas Connected Backend 2026"
+            "architecture": "Premium MongoDB Atlas Connected Backend 2026",
+            "audio_engine": "Edge-TTS Neural Synthesizer Active"
         }, 200
 
     return app

@@ -2,6 +2,9 @@
 import os
 import json
 import logging
+import asyncio
+import edge_tts
+import re
 from datetime import date
 
 # ==========================================
@@ -52,10 +55,52 @@ llm = ChatGoogleGenerativeAI(
     temperature=0.6 # Optimized for high technical precision and fluid narrative
 ) 
 
+# =====================================================================
+# THE EDGE-TTS AUDIO ENGINE 
+# =====================================================================
+
+def clean_text_for_speech(text):
+    """
+    Removes Markdown syntax (**, *, #, `) from the LLM output 
+    so the TTS engine speaks naturally like a human.
+    """
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text) # Remove bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)     # Remove italics
+    text = re.sub(r'#(.*?)\n', r'\1\n', text)    # Remove headers
+    text = text.replace('*', '')                 # Remove loose asterisks/bullets
+    text = text.replace('`', '')                 # Remove code ticks
+    return text.strip()
+
+def generate_audio_sync(text, output_filepath):
+    """
+    Generates high-definition neural TTS audio from text.
+    Injected with custom Rate and Pitch for an energetic, fast-paced human vibe.
+    """
+    clean_text = clean_text_for_speech(text)
+    
+    # 🎙️ VOICE OPTIONS
+    voice = "en-IN-PrabhatNeural" 
+    
+    # ⚡ ENERGY INJECTION
+    rate = "+15%" 
+    volume = "+0%"
+    pitch = "+2Hz"
+
+    async def _generate():
+        # Passing the energy parameters to the TTS engine
+        communicate = edge_tts.Communicate(clean_text, voice, rate=rate, volume=volume, pitch=pitch)
+        await communicate.save(output_filepath)
+        
+    asyncio.run(_generate())
+
+# =====================================================================
+# KNOWLEDGE BASE & RAG PIPELINE (UPGRADED FOR DEEP CONTEXT)
+# =====================================================================
+
 def build_knowledge_base():
     """
-    Ingests raw JSON portfolio data, processes it into semantic chunks, 
-    and vectorizes it into ChromaDB for high-speed similarity search.
+    Ingests raw JSON portfolio data (including Hidden Readmes, CVs, and Family Meta),
+    processes it into semantic chunks, and vectorizes it into ChromaDB.
     """
     portfolio = get_complete_portfolio()
     docs = []
@@ -75,6 +120,19 @@ def build_knowledge_base():
     maps_link = f"https://www.google.com/maps/search/?api=1&query={location.replace(' ', '+')}"
     docs.append(Document(page_content=f"Operating Base: {location}. Maps Link: {maps_link}", metadata={"category": "location"}))
 
+    # UPGRADE 1: MASTER CV INGESTION
+    master_cv = core.get("master_cv_text", "")
+    if master_cv.strip():
+        cv_context = f"[MASTER RESUME / CV DATA] The following is the absolute truth regarding Salik's professional background extracted directly from his resume: {master_cv}"
+        docs.append(Document(page_content=cv_context, metadata={"category": "resume"}))
+
+    # UPGRADE 2: FAMILY & PERSONAL BACKGROUND INGESTION
+    family_meta = portfolio.get("family_meta", {})
+    family_summary = family_meta.get("summary", "")
+    if family_summary.strip():
+        family_context = f"[PERSONAL & FAMILY BACKGROUND] Context regarding Salik's personal life and family details: {family_summary}"
+        docs.append(Document(page_content=family_context, metadata={"category": "personal"}))
+
     # Experience, Projects, and Certifications Matrix
     categories = ["projects", "experiences", "education", "certifications_and_achievements"]
     for cat in categories:
@@ -83,12 +141,16 @@ def build_knowledge_base():
             link_strings = [f"[{link.get('label', 'Link')}]({link.get('url', '')})" for link in smart_links if link.get("url")]
             all_links_formatted = " | ".join(link_strings) if link_strings else "No dynamic links active."
             
-            item_text = f"[{cat.replace('_', ' ').title()}] Title: {item.get('title')}. Organization/Issuer: {item.get('organization_or_issuer')}. Timeline: {item.get('duration_or_date')}. Core Tech Stack & Skills: {item.get('tag_or_skills_mapped')}. Technical Architecture & Impact: {item.get('description')}. Actionable Resources: {all_links_formatted}."
+            # UPGRADE 3: HIDDEN README INGESTION
+            hidden_readme = item.get("hidden_readme", "")
+            deep_context_string = f" Deep Technical Context (Readme): {hidden_readme}." if hidden_readme.strip() else ""
+            
+            item_text = f"[{cat.replace('_', ' ').title()}] Title: {item.get('title')}. Organization/Issuer: {item.get('organization_or_issuer')}. Timeline: {item.get('duration_or_date')}. Core Tech Stack & Skills: {item.get('tag_or_skills_mapped')}. Technical Architecture & Impact: {item.get('description')}.{deep_context_string} Actionable Resources: {all_links_formatted}."
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
     try:
         Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir, client_settings=CHROMA_SETTINGS)
-        print("Vector Space Successfully Initialized with Dynamic Tracking.")
+        print("Vector Space Successfully Initialized with Deep Context (CV, Readmes, Family Data).")
     except Exception as e:
         print(f"Error vectorizing data: {e}")
 
@@ -98,7 +160,8 @@ def query_rag_brain(user_question):
         
     try:
         db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
-        retrieved_docs = db.similarity_search(user_question, k=4) 
+        # Increased 'k' to 6 so it can pull CV, Readme, AND specific project details together
+        retrieved_docs = db.similarity_search(user_question, k=6) 
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
         context_text = "Vector database read error. Reverting to baseline intelligence."
@@ -115,7 +178,7 @@ def query_rag_brain(user_question):
 
     STRICT OPERATING PROTOCOLS:
     1. ZERO ROBOTIC TRACES: Never say "As an AI...", "How can I assist you?", or use robotic filler. Speak directly like a passionate, brilliant human tech lead.
-    2. LANGUAGE INTERPRETATION & EXECUTION (CRITICAL): You have total capability to comprehend questions written in any language or slang (including Hinglish, Hindi, or conversational text). However, your response MUST STREAKLY BE EXECUTED IN HIGHLY POLISHED, CRISP, CORPORATE ENGLISH. Never output Hindi or Hinglish words under any circumstances.
+    2. LANGUAGE INTERPRETATION & EXECUTION (CRITICAL): You have total capability to comprehend questions written in any language or slang (including Hinglish, Hindi, or conversational text). However, your response MUST STRICTLY BE EXECUTED IN HIGHLY POLISHED, CRISP, CORPORATE ENGLISH. Never output Hindi or Hinglish words under any circumstances.
     3. SMART STRUCTURING & PACING: Never deliver long monologues. Keep your paragraphs punchy and concise. If answering a complex query, use short, sharp bullet points to make the information easy to digest for recruiters.
     4. VOCAL OPTIMIZATION (THE AUDIO RULE): Assume your response is being spoken by an avatar. Keep sentences flowy and natural. NEVER read out raw HTTP URLs, markdown links, or massive code blocks verbally. Direct the user to the attached links instead. Use regular full stops and punctuation marks for standard breathing loops.
     5. IDENTITY TRACKING: If asked about your age, use the exact dynamic age provided in the context matrix. Own your identity proudly as Md Salik Ubair's engineered twin.

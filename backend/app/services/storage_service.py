@@ -10,7 +10,7 @@ client = MongoClient(MONGO_URI)
 db = client["salik_portfolio"]
 collection = db["master_data"]
 
-# Initial Professional Schema with Smart Links & Dynamic DP Support
+# Initial Professional Schema with Smart Links, Dynamic DP & RAG Brain Support
 DEFAULT_STATE = {
     "_id": "global_state",
     "profile_core": {
@@ -23,7 +23,9 @@ DEFAULT_STATE = {
         "whatsapp_link": "",
         "skills_list": "",
         "languages_known": "",
-        "display_picture_url": ""   # NEW: Dynamic Display Picture (DP) for Frontend
+        "display_picture_url": "",  
+        "master_cv_url": "",        # NEW: Link for the "Download CV" button
+        "master_cv_text": ""        # NEW: Extracted raw text for the RAG Brain to consume
     },
     "social_channels": {
         "email": "", 
@@ -53,15 +55,15 @@ def get_complete_portfolio():
     return doc
 
 def update_profile_core(payload):
-    """Refines top-level core details including Phone, WhatsApp, and DP URL."""
+    """Refines top-level core details including Phone, WhatsApp, DP URL, and Master CV."""
     doc = _get_document()
     core = doc.get("profile_core", {})
     
-    # Added display_picture_url to the updatable fields
+    # Added CV fields to the updatable array
     fields_to_update = [
         "full_name", "professional_title", "location", "profile_summary", 
         "current_status", "phone_number", "whatsapp_link", "skills_list", 
-        "languages_known", "display_picture_url"
+        "languages_known", "display_picture_url", "master_cv_url", "master_cv_text"
     ]
     
     for key in fields_to_update:
@@ -106,11 +108,15 @@ def insert_dynamic_item(category, payload):
         "organization_or_issuer": payload.get("organization_or_issuer") or payload.get("institution"),
         "duration_or_date": payload.get("duration_or_date"),
         "description": payload.get("description", ""),
+        
+        # UPGRADED: Hidden Readme for RAG deep context
+        "hidden_readme": payload.get("hidden_readme", ""),
+        
         "score_or_credential_id": payload.get("score_or_credential_id", ""), 
         "tag_or_skills_mapped": payload.get("tag_or_skills_mapped", ""),       
         "image_urls": payload.get("image_urls", []) if isinstance(payload.get("image_urls"), list) else ([payload.get("image_url")] if payload.get("image_url") else []),        
         
-        # UPGRADED: Smart Links Matrix (Array of {label, url})
+        # Smart Links Matrix (Array of {label, url})
         "smart_links": payload.get("smart_links", []),
         
         # Legacy support
@@ -126,8 +132,8 @@ def insert_dynamic_item(category, payload):
 
 def update_dynamic_item(category, item_id, payload):
     """
-    NEW FUNCTION: Edits an existing node inside a category array without changing its ID.
-    Supports injecting multiple image URLs, Smart Links, and updating text parameters dynamically.
+    Edits an existing node inside a category array without changing its ID.
+    Automatically handles injected updates like hidden_readme without extra logic.
     """
     valid_categories = ["experiences", "projects", "education", "certifications_and_achievements"]
     if category not in valid_categories:

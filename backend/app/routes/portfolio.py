@@ -6,13 +6,12 @@ from app.services.storage_service import (
     get_complete_portfolio, 
     insert_dynamic_item, 
     remove_dynamic_item, 
-    update_dynamic_item, # NAYA: Edit function import
+    update_dynamic_item, 
     update_profile_core,
     update_social_channels,
     update_family_meta
 )
 
-# NAYA: RAG engine re-builder import
 from app.services.rag_service import build_knowledge_base
 
 portfolio_bp = Blueprint('portfolio', __name__)
@@ -28,9 +27,11 @@ def fetch_portfolio_state():
 
 @portfolio_bp.route('/update-core', methods=['POST'])
 def edit_profile_core_headers():
-    """Updates the core identity block (Full Name, Title, Location, Summary, Status, Phone, WhatsApp)."""
+    """Updates the core identity block (Full Name, Title, DP URL, and Master CV URL for RAG)."""
     try:
         data = request.get_json() or {}
+        # Note: If CV text extraction is needed here, we can add a PyMuPDF text extractor helper later.
+        # For now, it accepts master_cv_url and master_cv_text directly from frontend payload.
         updated_core = update_profile_core(data)
         trigger_vector_sync() # AI Update
         return jsonify({
@@ -60,6 +61,7 @@ def edit_social_channels():
 def create_portfolio_node(category):
     """
     Appends full length nodes dynamically to MongoDB arrays.
+    Now accepts 'hidden_readme' from the frontend for Deep RAG Context.
     Valid targets: experiences, projects, education, certifications_and_achievements
     """
     try:
@@ -84,11 +86,11 @@ def create_portfolio_node(category):
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ==========================================
-# THE NEW EDIT/UPDATE ROUTE FOR ADMIN HUB
+# THE EDIT/UPDATE ROUTE FOR ADMIN HUB
 # ==========================================
 @portfolio_bp.route('/item/<category>/<int:item_id>', methods=['PUT'])
 def edit_portfolio_node(category, item_id):
-    """Updates an existing asset node safely (Includes Multi-Image & Dynamic Link Support)."""
+    """Updates an existing asset node safely (Includes Multi-Image, Smart Links & Hidden Readme Support)."""
     try:
         valid_grids = ["experiences", "projects", "education", "certifications_and_achievements"]
         if category not in valid_grids:
