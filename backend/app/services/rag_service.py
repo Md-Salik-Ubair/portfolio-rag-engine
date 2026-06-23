@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Next-Gen 2.5 Ecosystem)
+# Production-Grade Dynamic RAG Context Engine (Fixed & Production-Ready Ecosystem)
 import os
 import json
 import logging
@@ -11,6 +11,7 @@ from datetime import date
 # ==========================================
 # THE ASSASSIN PROTOCOL: TELEMETRY KILL SWITCH
 # ==========================================
+# These env vars are set before importing Langchain/Chroma to ensure telemetry is hard-killed
 os.environ["CHROMA_TELEMETRY_DISABLED"] = "1"
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 os.environ["POSTHOG_DISABLED"] = "1"
@@ -35,7 +36,7 @@ gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if gemini_api_key:
     os.environ["GOOGLE_API_KEY"] = gemini_api_key  
 else:
-    print("🚨 FATAL ERROR: API KEY MISSING FROM ENVIRONMENT!")
+    print("🚨 FATAL ERROR: Gemini/Google API KEY MISSING FROM ENVIRONMENT!")
 
 from app.services.storage_service import get_complete_portfolio
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -43,16 +44,16 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma 
 
 # -------------------------------------------------------------------
-# NEURAL ARCHITECTURE: EMBEDDINGS & LLM 
+# NEURAL ARCHITECTURE: STABLE EMBEDDINGS & LLM 
 # -------------------------------------------------------------------
-# Vectorization Engine
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2", google_api_key=gemini_api_key)
+# Vectorization Engine (Stabilized for text-embedding-004)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# Core Intelligence Engine
+# Core Intelligence Engine (Stabilized for Gemini 1.5 Flash - Production Grade)
 llm = ChatGoogleGenerativeAI(
-    model="models/gemini-2.5-flash", 
+    model="gemini-1.5-flash", 
     google_api_key=gemini_api_key,
     temperature=0.6, # Optimized for high technical precision and fluid narrative
     max_retries=3    # Built-in Langchain retries
@@ -159,16 +160,21 @@ def build_knowledge_base():
             docs.append(Document(page_content=item_text, metadata={"category": cat, "title": item.get("title", "Unknown Node")}))
         
     try:
+        # Chroma initialization uses the stable embedding function text-embedding-004
         Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir, client_settings=CHROMA_SETTINGS)
         print("Vector Space Successfully Initialized with Deep Context.")
     except Exception as e:
         print(f"Error vectorizing data: {e}")
 
 def query_rag_brain(user_question):
+    """
+    Queries the RAG brain with the user's question, strictly enforcing stable models.
+    """
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
     try:
+        # DB retrieval also strictly uses the text-embedding-004 stabilized function
         db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
         # Pull top 6 highly relevant contexts (CV, Readme, Projects combined)
         retrieved_docs = db.similarity_search(user_question, k=6) 
@@ -180,6 +186,7 @@ def query_rag_brain(user_question):
     # =====================================================================
     # THE "MASTER PRO ULTRA SMART" PERSONALITY PROTOCOL
     # =====================================================================
+    # Enforces hyper-realistic twin persona with dynamic age/state tracking.
     prompt = f"""
     SYSTEM OVERRIDE: CORE IDENTITY AND MULTILINGUAL INPUT RECOGNITION INITIALIZED.
     You are the hyper-realistic Digital Twin of Md Salik Ubair, a top-tier AI Engineer and Data Scientist. You operate dynamically, tracking your creator's real-time age and professional state via the injected context matrix.
@@ -205,15 +212,18 @@ def query_rag_brain(user_question):
     """
     
     # ---------------------------------------------------------
-    # ROBUST FALLBACK & RETRY MECHANISM
+    # ROBUST FALLBACK & RETRY MECHANISM (Strictly uses Gemini 1.5 Flash)
     # ---------------------------------------------------------
+    # Retries ensure stability against temporary rate limits or failures.
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            # Invokes the Gemini 1.5 Flash stabilized Intelligence Engine
             response = llm.invoke(prompt)
             return response.content
         except Exception as e:
             logging.error(f"Gemini API Error (Attempt {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
+                # Professional fallback only after all retries fail.
                 return "My neural network is currently optimizing a massive data stream. Please give me a moment and try asking again."
             time.sleep(1.5) # Short pause before retry to bypass temporary rate limits
