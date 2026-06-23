@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+// Original Video & Image Assets Restored
 import avatarImg from './assets/avatar.jpg';
+import idleVideo from './assets/idle.mp4';
+import speakingVideo from './assets/speaking.mp4';
+import thinkingVideo from './assets/thinking.mp4';
+
+// Backend URL (LIVE RENDER SERVER)
+const API_BASE_URL = 'https://salik-portfolio-backend.onrender.com';
 
 // ==========================================
-// FULL CINEMATIC APP (DEEP & CONFIDENT VOICE OPTIMIZED)
+// FULL CINEMATIC APP (VIRTUAL PRESENCE & LIVE CAPTIONS)
 // ==========================================
 function App() {
   const [currentView, setCurrentView] = useState('portfolio'); 
@@ -14,27 +22,29 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // AI Chat & Voice Interface
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatQuestion, setChatQuestion] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: "Hello! I am the AI representation of Md Salik Ubair. I can tell you all about his projects, skills, and experience. What would you like to know?" }
-  ]);
-  const [isAiTyping, setIsAiTyping] = useState(false);
+  // AI Cinematic Interface States
+  const speakingRef = useRef(null);
+  const thinkingRef = useRef(null);
+  const audioRef = useRef(null);
+  const chatEndRef = useRef(null);
   
-  // Voice & Animation States
+  const [aiState, setAiState] = useState('standby'); 
+  const [userQuery, setUserQuery] = useState('');
+  const [chatHistory, setChatHistory] = useState([]); 
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false); 
 
-  // Upload & Edit States
-  const [isUploading, setIsUploading] = useState(false);
+  // Upload, Edit & Modal States
+  const [isUploadingDP, setIsUploadingDP] = useState(false);
+  const [isUploadingItemImg, setIsUploadingItemImg] = useState(false);
   const [editingNode, setEditingNode] = useState(null); 
+  const [viewingNode, setViewingNode] = useState(null); 
 
   // Admin Forms
   const [profileForm, setProfileForm] = useState({
     full_name: '', professional_title: '', location: '', profile_summary: '', current_status: '',
     skills_list: '', languages_known: '', phone_number: '', whatsapp_link: '', family_narrative: '',
-    display_picture_url: '' 
+    display_picture_url: '', master_cv_url: '', master_cv_text: ''
   });
 
   const [socialForm, setSocialForm] = useState({
@@ -43,13 +53,22 @@ function App() {
 
   const [itemForm, setItemForm] = useState({
     category: 'projects', title: '', organization_or_issuer: '', duration_or_date: '',
-    description: '', tag_or_skills_mapped: '', external_redirection_link: '',
-    smart_links: []
+    description: '', hidden_readme: '', tag_or_skills_mapped: '', smart_links: [], image_urls: [] 
   });
   const [tempLink, setTempLink] = useState({ label: '', url: '' });
 
+  // Auto-scroll chat log flawlessly
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory.length, aiState]);
+
+  // ---------------------------------------------------------
+  // CORE API FETCHING (CRASH PROOF)
+  // ---------------------------------------------------------
   const refreshPortfolioData = () => {
-    fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/data')
+    fetch(`${API_BASE_URL}/api/portfolio/data`)
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
@@ -65,7 +84,9 @@ function App() {
             skills_list: data.profile_core?.skills_list || '',
             languages_known: data.profile_core?.languages_known || '',
             family_narrative: data.family_meta?.summary || '',
-            display_picture_url: data.profile_core?.display_picture_url || ''
+            display_picture_url: data.profile_core?.display_picture_url || '',
+            master_cv_url: data.profile_core?.master_cv_url || '',
+            master_cv_text: data.profile_core?.master_cv_text || ''
           });
           setSocialForm({
             email: data.social_channels?.email || '',
@@ -86,7 +107,7 @@ function App() {
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
-    fetch('https://salik-portfolio-backend.onrender.com/api/auth/login', {
+    fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     }).then(res => res.json()).then(data => {
@@ -95,212 +116,205 @@ function App() {
     }).catch(() => alert("Server unreachable."));
   };
 
-  const handleImageUpload = async (e) => {
+  // ---------------------------------------------------------
+  // FORMS & DATA SUBMISSION 
+  // ---------------------------------------------------------
+  const handleImageUpload = async (e, type = 'dp') => {
     const file = e.target.files[0];
     if (!file) return;
-    
     const IMGBB_API_KEY = "67a2f496c1625f298a33f240d8366100"; 
-    setIsUploading(true);
+    
+    if (type === 'dp') setIsUploadingDP(true);
+    else setIsUploadingItemImg(true);
+
     const formData = new FormData();
     formData.append('image', file);
 
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-        method: 'POST', body: formData
-      });
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
-        setProfileForm({ ...profileForm, display_picture_url: data.data.url });
-        alert("✅ Photo Uploaded to Cloud Successfully! Please click 'Commit Profile Data' to save.");
-      } else {
-        alert("Upload Failed. Check API Key.");
-      }
-    } catch (err) {
-      alert("Network Error during upload.");
-    }
-    setIsUploading(false);
+        if (type === 'dp') {
+            setProfileForm({ ...profileForm, display_picture_url: data.data.url });
+            alert("✅ Profile Photo Uploaded!");
+        } else {
+            setItemForm({ ...itemForm, image_urls: [...(itemForm.image_urls || []), data.data.url] });
+        }
+      } else { alert("Upload Failed."); }
+    } catch (err) { alert("Network Error during upload."); }
+
+    if (type === 'dp') setIsUploadingDP(false);
+    else setIsUploadingItemImg(false);
   };
 
-  const handleProfileSubmit = (e) => {
-    e.preventDefault();
-    fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-core', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileForm)
-    })
-    .then(res => res.json())
-    .then(resData => {
-      if (resData.success) {
-        fetch('https://salik-portfolio-backend.onrender.com/api/portfolio/update-family', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: profileForm.family_narrative })
-        })
-        .then(() => { alert("✅ Profile Data Saved!"); refreshPortfolioData(); })
-      }
-    });
-  };
-
-  // SMART LINKS LOGIC
-  const addSmartLink = (e) => {
-    e.preventDefault();
-    if (tempLink.label.trim() && tempLink.url.trim()) {
-        setItemForm({ ...itemForm, smart_links: [...(itemForm.smart_links || []), tempLink] });
-        setTempLink({ label: '', url: '' });
-    }
+  const removeUploadedImage = (index) => {
+      const newImages = [...(itemForm.image_urls || [])];
+      newImages.splice(index, 1);
+      setItemForm({ ...itemForm, image_urls: newImages });
   };
   
-  const removeSmartLink = (index) => {
-    const newLinks = [...(itemForm.smart_links || [])];
-    newLinks.splice(index, 1);
-    setItemForm({ ...itemForm, smart_links: newLinks });
-  };
-
-  // EDIT & DELETE LOGIC
-  const triggerEditNode = (category, node) => {
-    setEditingNode({ category, id: node.id });
-    setItemForm({
-        category: category,
-        title: node.title || '',
-        organization_or_issuer: node.organization_or_issuer || '',
-        duration_or_date: node.duration_or_date || '',
-        description: node.description || '',
-        tag_or_skills_mapped: node.tag_or_skills_mapped || '',
-        external_redirection_link: node.external_redirection_link || '',
-        smart_links: node.smart_links || []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const cancelEdit = () => {
-    setEditingNode(null);
-    setItemForm({
-        category: 'projects', title: '', organization_or_issuer: '', duration_or_date: '',
-        description: '', tag_or_skills_mapped: '', external_redirection_link: '', smart_links: []
-    });
-  };
-
-  const handleItemSubmit = (e) => {
+  const handleProfileSubmit = (e) => {
     e.preventDefault();
-    const url = editingNode 
-        ? `https://salik-portfolio-backend.onrender.com/api/portfolio/item/${editingNode.category}/${editingNode.id}`
-        : `https://salik-portfolio-backend.onrender.com/api/portfolio/item/${itemForm.category}`;
-    
-    const method = editingNode ? 'PUT' : 'POST';
-
-    fetch(url, {
-      method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itemForm)
+    fetch(`${API_BASE_URL}/api/portfolio/update-core`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileForm)
     }).then(res => res.json()).then(resData => {
       if (resData.success) {
-        alert(`Item ${editingNode ? 'updated' : 'published'} successfully.`);
-        cancelEdit(); 
-        refreshPortfolioData();
-      } else {
-        alert("Action failed: " + resData.error);
+        fetch(`${API_BASE_URL}/api/portfolio/update-socials`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(socialForm)
+        }).then(() => { 
+            fetch(`${API_BASE_URL}/api/portfolio/update-family`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: profileForm.family_narrative })
+            }).then(() => {
+                alert("✅ Master Details & Family Data Saved! RAG Brain Updating..."); 
+                refreshPortfolioData(); 
+            });
+        });
       }
     });
   };
 
-  const handleDeleteNode = (category, id) => {
-    if (!window.confirm("Are you sure you want to permanently delete this item?")) return;
-    fetch(`https://salik-portfolio-backend.onrender.com/api/portfolio/item/${category}/${id}`, { method: 'DELETE' })
-    .then(res => res.json()).then(resData => { if (resData.success) refreshPortfolioData(); });
+  const addSmartLink = (e) => { e.preventDefault(); if (tempLink.label.trim() && tempLink.url.trim()) { setItemForm({ ...itemForm, smart_links: [...(itemForm.smart_links || []), tempLink] }); setTempLink({ label: '', url: '' }); } };
+  const removeSmartLink = (index) => { const newLinks = [...(itemForm.smart_links || [])]; newLinks.splice(index, 1); setItemForm({ ...itemForm, smart_links: newLinks }); };
+  
+  const triggerEditNode = (category, node, e) => { 
+    if(e) e.stopPropagation();
+    let loadedSmartLinks = node.smart_links ? [...node.smart_links] : [];
+    if (node.external_redirection_link && loadedSmartLinks.length === 0) { loadedSmartLinks.push({ label: 'Project Link', url: node.external_redirection_link }); }
+    setEditingNode({ category, id: node.id }); 
+    setItemForm({ 
+        category: category, 
+        title: node.title || '', 
+        organization_or_issuer: node.organization_or_issuer || '', 
+        duration_or_date: node.duration_or_date || '', 
+        description: node.description || '', 
+        hidden_readme: node.hidden_readme || '',
+        tag_or_skills_mapped: node.tag_or_skills_mapped || '', 
+        smart_links: loadedSmartLinks, 
+        image_urls: node.image_urls || [] 
+    }); 
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // ==========================================
-  // DEEP, POWERFUL & CONFIDENT VOICE ENGINE
-  // ==========================================
-  const stopAudio = () => {
-    try {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    } catch (e) {
-      console.warn("Speech API cancel ignored.");
-    }
-    setIsSpeaking(false);
-  };
-
-  const toggleMute = () => {
-    setIsAudioEnabled(!isAudioEnabled);
-    stopAudio();
-  };
-
-  const speakText = (text) => {
-    if (!isAudioEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
-    try {
-      const safeText = String(text || "");
-      const cleanText = safeText
-        .replace(/[*#`]/g, '') 
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1'); 
-
-      stopAudio(); 
-      
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      const voices = window.speechSynthesis.getVoices();
-      
-      // Targeting the deepest built-in voices available on the user's OS
-      const preferredVoice = 
-        voices.find(v => v.name.includes('Google UK English Male')) ||
-        voices.find(v => v.name.includes('Mark')) || // Microsoft Mark is generally deeper
-        voices.find(v => v.name.includes('David')) || 
-        voices.find(v => (v.name.includes('India') || v.name.includes('en-IN')) && v.name.includes('Male')) ||
-        voices.find(v => v.name.includes('Male')) ||
-        voices[0];
-
-      if (preferredVoice) utterance.voice = preferredVoice;
-
-      // THE MAGIC TWEAKS FOR CONFIDENCE AND DEPTH
-      utterance.rate = 0.92; // Slightly slower. Shows confidence and clarity.
-      utterance.pitch = 0.7; // Lower pitch to make it sound heavier and more masculine.
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-
-      window.speechSynthesis.speak(utterance);
-    } catch (error) {
-      console.error("Audio playback error caught safely:", error);
-      setIsSpeaking(false);
-    }
-  };
-
-  const handleAiQuery = (questionText) => {
-    if (!questionText.trim()) return;
-    
-    stopAudio(); 
-    
-    setChatHistory(prev => [...prev, { role: 'user', text: questionText }]);
-    setIsAiTyping(true);
-
-    fetch('https://salik-portfolio-backend.onrender.com/api/rag/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: questionText })
-    }).then(res => res.json()).then(data => {
-      const responseText = data.ai_response || "I couldn't fetch that information right now. Please try again.";
-      setChatHistory(prev => [...prev, { role: 'ai', text: responseText }]);
-      setIsAiTyping(false);
-      speakText(responseText); 
-    }).catch(() => {
-      const errorText = "It seems there's a network issue. Let's try that again in a moment.";
-      setChatHistory(prev => [...prev, { role: 'ai', text: errorText }]);
-      setIsAiTyping(false);
-      speakText(errorText);
-    });
-  };
-
-  const triggerChatRequest = (e) => {
+  const cancelEdit = () => { setEditingNode(null); setItemForm({ category: 'projects', title: '', organization_or_issuer: '', duration_or_date: '', description: '', hidden_readme: '', tag_or_skills_mapped: '', smart_links: [], image_urls: [] }); };
+  
+  const handleItemSubmit = (e) => {
     e.preventDefault();
-    if (!chatQuestion.trim()) return;
-    handleAiQuery(chatQuestion);
-    setChatQuestion('');
+    const url = editingNode ? `${API_BASE_URL}/api/portfolio/item/${editingNode.category}/${editingNode.id}` : `${API_BASE_URL}/api/portfolio/item/${itemForm.category}`;
+    fetch(url, { method: editingNode ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itemForm) })
+    .then(res => res.json()).then(resData => { if (resData.success) { alert(`Saved & Pushed to RAG Engine.`); cancelEdit(); refreshPortfolioData(); } });
   };
 
-  const formatAiResponse = (rawText) => {
-      const safeText = String(rawText || "");
-      const cleaned = safeText.replace(/[*#`]/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1 (Link Attached)');
-      return cleaned.split('\n').map((line, idx) => (
-          line.trim() ? <p key={idx} className="mb-2">{line}</p> : null
-      ));
+  const handleDeleteNode = (category, id, e) => {
+    if(e) e.stopPropagation();
+    if (!window.confirm("Delete this entry permanently?")) return;
+    fetch(`${API_BASE_URL}/api/portfolio/item/${category}/${id}`, { method: 'DELETE' }).then(res => res.json()).then(resData => { if (resData.success) refreshPortfolioData(); });
   };
 
-  const activeAvatar = backendData?.profile_core?.display_picture_url || avatarImg;
+  // ==========================================
+  // VIRTUAL PRESENCE ENGINE
+  // ==========================================
+  const isMuted = !isAudioEnabled;
+
+  const stopAllAudio = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    if (speakingRef.current) { speakingRef.current.pause(); speakingRef.current.currentTime = 0; }
+    if (thinkingRef.current) { thinkingRef.current.pause(); thinkingRef.current.currentTime = 0; }
+  };
+
+  const toggleAudio = () => {
+    setIsAudioEnabled(prev => !prev);
+  };
+
+  useEffect(() => {
+      if (audioRef.current) audioRef.current.muted = isMuted;
+      if (speakingRef.current) speakingRef.current.muted = isMuted;
+      if (thinkingRef.current) thinkingRef.current.muted = isMuted;
+  }, [isMuted]);
+
+  const startIntroSequence = () => {
+    setAiState('intro');
+    const introText = "Greetings. I am the digital twin of Md Salik Ubair. How can I assist you in exploring his engineering portfolio?";
+    setChatHistory([{ role: 'ai', text: introText }]);
+    
+    if (!isMuted && speakingRef.current) {
+        speakingRef.current.currentTime = 0;
+        speakingRef.current.play().catch(e => console.error("AutoPlay blocked:", e));
+    } else {
+        setTimeout(() => setAiState('idle'), 2500); 
+    }
+  };
+
+  const handleSpeakingEnded = () => {
+    if (aiState === 'intro') setAiState('idle');
+  };
+
+  const handleThinkingEnded = () => {
+    if (aiState === 'thinking') setAiState('idle_waiting');
+  };
+
+  const playBackendStream = (data) => {
+    const responseText = data.ai_response || "Connection established.";
+    const audioUrl = data.audio_url;
+    
+    const cleanSub = responseText.replace(/[*#`]/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+    setChatHistory(prev => [...prev, { role: 'ai', text: cleanSub }]);
+    
+    if (audioUrl && !isMuted) {
+        setAiState('answering');
+        const fullAudioUrl = `${API_BASE_URL}${audioUrl}`;
+        const audio = new Audio(fullAudioUrl);
+        audioRef.current = audio;
+        audio.muted = false;
+        
+        audio.onplay = () => {
+            if (speakingRef.current) {
+                speakingRef.current.currentTime = 0;
+                speakingRef.current.play().catch(e => console.log(e));
+            }
+        };
+        
+        audio.onended = () => {
+            setAiState('idle');
+            if (speakingRef.current) speakingRef.current.pause();
+        };
+        
+        audio.onerror = () => setAiState('idle');
+        audio.play().catch(e => { console.error("Audio blocked:", e); setAiState('idle'); });
+    } else {
+        setAiState('idle');
+    }
+  };
+
+  const triggerAiQuery = (e) => {
+    e.preventDefault();
+    if (!userQuery.trim() || ['intro', 'thinking', 'answering'].includes(aiState)) return;
+    
+    const questionToAsk = userQuery;
+    setChatHistory(prev => [...prev, { role: 'user', text: questionToAsk }]);
+    setUserQuery('');
+    
+    setAiState('thinking');
+    stopAllAudio(); 
+
+    if (thinkingRef.current && !isMuted) {
+        thinkingRef.current.currentTime = 0;
+        thinkingRef.current.play().catch(e => console.log(e));
+    }
+
+    fetch(`${API_BASE_URL}/api/rag/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: questionToAsk })
+    })
+    .then(res => res.json())
+    .then(data => playBackendStream(data))
+    .catch(() => {
+      setChatHistory(prev => [...prev, { role: 'ai', text: "Network dropout. Re-establishing connection..." }]);
+      setAiState('idle');
+    });
+  };
+
+  const showThinking = aiState === 'thinking' && !isMuted;
+  const showSpeaking = ['intro', 'answering'].includes(aiState) && !isMuted;
+  const showIdle = ['standby', 'idle', 'idle_waiting'].includes(aiState) || isMuted;
 
   return (
     <div className="min-h-screen bg-[#020202] text-slate-100 font-sans antialiased overflow-x-hidden relative selection:bg-sky-500/30">
@@ -317,125 +331,213 @@ function App() {
             SALIK<span className="text-sky-500">.AI</span>
           </span>
         </div>
-        <div className="flex items-center gap-6">
-          <button onClick={() => setCurrentView('portfolio')} className={`text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'portfolio' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>Terminal</button>
-          <button onClick={() => setCurrentView('admin-hub')} className={`text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'admin-hub' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>System Hub</button>
+        <div className="flex items-center gap-4 md:gap-6">
+          <button onClick={() => setCurrentView('portfolio')} className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'portfolio' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>Portfolio</button>
+          <button onClick={() => setCurrentView('admin-hub')} className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'admin-hub' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>Admin</button>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-8 pt-32 pb-32 relative z-10">
+      {/* ========================================================= */}
+      {/* 🚀 CINEMATIC MODAL POPUP FOR NODES (PREMIUM) 🚀 */}
+      {/* ========================================================= */}
+      {viewingNode && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-10 bg-black/90 backdrop-blur-2xl animate-fadeIn" onClick={() => setViewingNode(null)}>
+              <div className="bg-[#050505] border border-white/10 w-full h-full md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] md:rounded-3xl overflow-y-auto shadow-[0_0_100px_rgba(0,0,0,1)] relative scrollbar-hide" onClick={e => e.stopPropagation()}>
+                  
+                  {/* Close Button */}
+                  <button onClick={() => setViewingNode(null)} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-black/60 hover:bg-red-500 text-white rounded-full flex items-center justify-center border border-white/20 transition-colors z-50 font-bold backdrop-blur-xl">✕</button>
+                  
+                  {/* Cinematic Header Image */}
+                  <div className="w-full h-56 md:h-80 relative bg-black flex items-end">
+                      {viewingNode?.image_urls?.length > 0 && (
+                          <img src={viewingNode.image_urls[0]} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50 blur-[2px]" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent z-10" />
+                      
+                      <div className="relative z-20 p-6 md:p-12 w-full translate-y-6">
+                          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                              <span className="bg-sky-500/20 text-sky-400 text-[10px] md:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-sky-500/30">{viewingNode._category?.replace(/_/g, ' ')}</span>
+                              <span className="text-xs md:text-sm font-mono text-slate-400 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">{viewingNode.duration_or_date}</span>
+                          </div>
+                          <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight drop-shadow-lg">{viewingNode.title}</h2>
+                          <p className="text-base md:text-xl text-indigo-300 font-medium mt-2">{viewingNode.organization_or_issuer}</p>
+                      </div>
+                  </div>
+                  
+                  <div className="p-6 md:p-12 pt-10 md:pt-16 space-y-6 md:space-y-8 relative z-20">
+                      {viewingNode.tag_or_skills_mapped && (
+                          <div className="flex flex-wrap gap-2">
+                              {viewingNode.tag_or_skills_mapped.split(',').map((skill, i) => (
+                                  <span key={i} className="bg-white/5 border border-white/10 text-slate-300 text-[10px] md:text-xs font-medium px-3 py-1.5 md:px-4 md:py-1.5 rounded-full">{skill.trim()}</span>
+                              ))}
+                          </div>
+                      )}
+
+                      <div className="prose prose-invert max-w-none text-slate-300 text-sm md:text-base leading-relaxed whitespace-pre-line">
+                          {viewingNode.description}
+                      </div>
+
+                      {/* Render Hidden Readme if it exists */}
+                      {viewingNode.hidden_readme && (
+                          <div className="mt-8 p-5 md:p-6 bg-sky-900/10 border border-sky-500/20 rounded-2xl">
+                              <h4 className="text-sky-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-3 md:mb-4 flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></div>
+                                  Deep Tech Readme (AI Context)
+                              </h4>
+                              <p className="text-xs md:text-sm text-slate-400 font-mono whitespace-pre-line">{viewingNode.hidden_readme}</p>
+                          </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-3 md:gap-4 pt-6 md:pt-8 border-t border-white/10">
+                          {viewingNode.smart_links?.map((link, idx) => (
+                              <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white text-black hover:bg-sky-400 text-xs md:text-sm font-bold px-5 py-2.5 md:px-6 md:py-3 rounded-xl transition-transform hover:-translate-y-1 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
+                                  {link.label} ↗
+                              </a>
+                          ))}
+                          {!viewingNode.smart_links?.length && viewingNode.external_redirection_link && (
+                              <a href={viewingNode.external_redirection_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white text-black hover:bg-sky-400 text-xs md:text-sm font-bold px-5 py-2.5 md:px-6 md:py-3 rounded-xl transition-transform hover:-translate-y-1 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
+                                  View Project ↗
+                              </a>
+                          )}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <main className="max-w-7xl mx-auto p-4 md:p-8 pt-24 md:pt-32 pb-32 relative z-10">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
             <div className="h-10 w-10 border-2 border-t-transparent border-sky-400 rounded-full animate-spin" />
-            <p className="text-xs text-sky-400/80 tracking-widest font-mono uppercase animate-pulse">Establishing Secure Uplink...</p>
+            <p className="text-xs text-sky-400/80 tracking-widest font-mono uppercase animate-pulse">Loading Database...</p>
           </div>
         ) : currentView === 'portfolio' ? (
           
           /* ================= VIEW 1: PORTFOLIO ================= */
-          <div className="space-y-16 animate-fadeIn">
+          <div className="space-y-12 md:space-y-16 animate-fadeIn">
             
             {/* HERO SECTION */}
-            <div className="relative flex flex-col md:flex-row items-center justify-between gap-12 p-8 md:p-12 border border-white/10 bg-white/[0.02] rounded-[2.5rem] backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden group">
+            <div className="relative flex flex-col-reverse lg:flex-row items-center justify-between gap-8 md:gap-12 p-6 md:p-12 border border-white/10 bg-white/[0.02] rounded-[2rem] md:rounded-[2.5rem] backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-sky-400 to-indigo-600" />
               
-              <div className="flex-1 space-y-6 relative z-10">
-                <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-white">
+              <div className="flex-1 space-y-5 md:space-y-6 relative z-10 w-full text-center lg:text-left">
+                <h1 className="text-4xl md:text-5xl lg:text-7xl font-extrabold tracking-tighter text-white">
                   {backendData?.profile_core?.full_name || "Md Salik Ubair"}
                 </h1>
-                <p className="text-lg md:text-xl text-sky-400 font-medium tracking-wide border-l-2 border-indigo-500 pl-4">
-                  {backendData?.profile_core?.professional_title || "Update title in Admin Hub"}
-                </p>
+                
+                {/* Location Integration Restored */}
+                <div className="flex flex-col lg:flex-row items-center lg:items-start gap-2 text-base md:text-xl text-sky-400 font-medium tracking-wide lg:border-l-2 lg:border-indigo-500 lg:pl-4">
+                    <span>{backendData?.profile_core?.professional_title || "Update Title in Dashboard"}</span>
+                    {backendData?.profile_core?.location && (
+                        <div className="flex items-center gap-2">
+                            <span className="hidden lg:inline text-slate-500">•</span>
+                            <span className="text-slate-300 text-xs md:text-sm bg-white/5 lg:bg-transparent px-3 py-1 lg:px-0 lg:py-0 rounded-full">{backendData.profile_core.location}</span>
+                        </div>
+                    )}
+                </div>
 
-                <div className="flex flex-wrap gap-3 text-sm mt-4">
-                  {backendData?.profile_core?.phone_number && <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-slate-300">📞 {backendData.profile_core.phone_number}</span>}
-                  {backendData?.profile_core?.whatsapp_link && <a href={backendData.profile_core.whatsapp_link} target="_blank" rel="noreferrer" className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors">💬 WhatsApp</a>}
-                  {backendData?.social_channels?.linkedin && <a href={backendData.social_channels.linkedin} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sky-400 hover:bg-white/10 transition-colors">LinkedIn ↗</a>}
-                  {backendData?.social_channels?.github && <a href={backendData.social_channels.github} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-slate-300 hover:bg-white/10 transition-colors">GitHub ↗</a>}
+                <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-xs md:text-sm mt-4">
+                  {backendData?.profile_core?.phone_number && <span className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-slate-300">📞 {backendData.profile_core.phone_number}</span>}
+                  {backendData?.social_channels?.email && <a href={`mailto:${backendData.social_channels.email}`} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-slate-300 hover:bg-white/10 transition-colors">✉️ Email</a>}
+                  {backendData?.social_channels?.linkedin && <a href={backendData.social_channels.linkedin} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-sky-400 hover:bg-white/10 transition-colors">LinkedIn ↗</a>}
+                  {backendData?.social_channels?.github && <a href={backendData.social_channels.github} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-slate-300 hover:bg-white/10 transition-colors">GitHub ↗</a>}
+                  
+                  {/* WhatsApp Component */}
+                  {backendData?.profile_core?.whatsapp_link && (
+                    <a href={backendData.profile_core.whatsapp_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 md:px-4 md:py-2 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                        💬 WhatsApp
+                    </a>
+                  )}
+
+                  {/* FIXED: Instagram Component with Gradient */}
+                  {backendData?.social_channels?.instagram && (
+                    <a href={backendData.social_channels.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg hover:opacity-90 transition-opacity font-bold shadow-[0_0_10px_rgba(236,72,153,0.3)]">
+                        📸 Instagram
+                    </a>
+                  )}
+
+                  {backendData?.profile_core?.master_cv_url && <a href={backendData.profile_core.master_cv_url} target="_blank" rel="noreferrer" className="bg-sky-500 text-black font-bold px-3 py-2 md:px-4 md:py-2 rounded-lg hover:bg-sky-400 transition-colors shadow-[0_0_15px_rgba(14,165,233,0.3)]">📄 Download CV</a>}
                 </div>
 
                 {backendData?.profile_core?.profile_summary && (
-                    <p className="text-slate-400 text-sm leading-relaxed max-w-2xl border-t border-white/5 pt-4 mt-4">
+                    <p className="text-slate-400 text-xs md:text-sm leading-relaxed max-w-2xl lg:border-t lg:border-white/5 lg:pt-4 lg:mt-4 mx-auto lg:mx-0">
                         {backendData.profile_core.profile_summary}
                     </p>
                 )}
               </div>
 
-              {/* Dynamic Main Character Matrix (Reacts to Audio) */}
-              <div className="relative w-72 h-72 md:w-[350px] md:h-[350px] flex-shrink-0">
-                 {/* Outer slow ring */}
-                 <div className="absolute inset-0 border-2 border-sky-500/20 rounded-full animate-[spin_10s_linear_infinite]" />
-                 {/* Inner fast ring */}
-                 <div className="absolute inset-4 border border-indigo-500/30 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
-                 
-                 {/* THIS IS THE VOICE AURA: Turns ON when speaking */}
-                 <div className={`absolute -inset-6 rounded-full blur-2xl transition-all duration-300 ${isSpeaking ? 'bg-sky-400/30 animate-pulse scale-110' : 'bg-sky-500/10'}`}></div>
-                 
-                 <div className={`absolute inset-6 rounded-full overflow-hidden border-2 transition-colors duration-300 ${isSpeaking ? 'border-sky-400 shadow-[0_0_60px_rgba(56,189,248,0.5)]' : 'border-white/10 bg-[#050505] shadow-[0_0_40px_rgba(0,0,0,0.8)]'}`}>
-                    <img src={activeAvatar} alt="Main Character" onError={(e) => { e.target.src = 'https://via.placeholder.com/400x400/050505/38bdf8?text=Image+Pending'; }} className={`w-full h-full object-cover transition-all duration-700 ${isSpeaking ? 'opacity-100 scale-105' : 'opacity-90 hover:opacity-100'}`} />
-                 </div>
+              {/* OPTIMIZED STATIC DP */}
+              <div className="relative w-40 md:w-[250px] lg:w-[300px] flex-shrink-0 z-20 mx-auto">
+                  <div className="relative w-full aspect-[4/5] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] bg-black">
+                      <img src={backendData?.profile_core?.display_picture_url || avatarImg} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
               </div>
             </div>
 
             {/* SKILLS & LANGUAGES */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-8 space-y-6">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Technical Expertise</h3>
+              <div className="md:col-span-2 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-4 md:space-y-6">
+                <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Technical Expertise</h3>
                 <div className="flex flex-wrap gap-2">
                   {backendData?.profile_core?.skills_list ? (
                     backendData.profile_core.skills_list.split(',').filter(s => s.trim() !== "").map((skill, index) => (
-                      <span key={index} className="bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs font-medium px-4 py-1.5 rounded-full shadow-[0_0_10px_rgba(14,165,233,0.1)]">{skill.trim()}</span>
+                      <span key={index} className="bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[10px] md:text-xs font-medium px-3 py-1.5 md:px-4 md:py-1.5 rounded-full shadow-[0_0_10px_rgba(14,165,233,0.1)]">{skill.trim()}</span>
                     ))
-                  ) : <span className="text-xs text-slate-600">No skills mapped.</span>}
+                  ) : <span className="text-[10px] md:text-xs text-slate-600">No skills added yet.</span>}
                 </div>
               </div>
-              <div className="md:col-span-1 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-8 space-y-6">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Languages</h3>
+              <div className="md:col-span-1 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-4 md:space-y-6">
+                <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Languages</h3>
                 <div className="flex flex-wrap gap-2">
                   {backendData?.profile_core?.languages_known ? (
                     backendData.profile_core.languages_known.split(',').filter(l => l.trim() !== "").map((lang, index) => (
-                      <span key={index} className="bg-white/5 border border-white/10 text-slate-300 text-xs px-4 py-1.5 rounded-full">{lang.trim()}</span>
+                      <span key={index} className="bg-white/5 border border-white/10 text-slate-300 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-1.5 rounded-full">{lang.trim()}</span>
                     ))
-                  ) : <span className="text-xs text-slate-600">No data.</span>}
+                  ) : <span className="text-[10px] md:text-xs text-slate-600">No languages added yet.</span>}
                 </div>
               </div>
             </div>
 
-            {/* DYNAMIC LISTS RENDER */}
+            {/* DYNAMIC LISTS RENDER (FIXED: MOBILE HORIZONTAL CAROUSEL) */}
             {['experiences', 'projects', 'education', 'certifications_and_achievements'].map((sec) => {
               if (!backendData || !backendData[sec] || backendData[sec].length === 0) return null;
               const displayTitle = sec.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               return (
-                <div key={sec} className="space-y-6 relative">
-                  <h2 className="text-xl font-bold text-white uppercase tracking-widest border-b border-white/10 pb-4 flex items-center gap-3">
+                <div key={sec} className="space-y-4 md:space-y-6 relative w-full overflow-hidden">
+                  <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-widest border-b border-white/10 pb-3 md:pb-4 flex items-center gap-3">
                      <div className="w-2 h-2 bg-sky-500 rounded-full" /> {displayTitle}
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {backendData[sec].map((item) => (
-                      <div key={item.id} className="group border border-white/10 bg-white/[0.02] backdrop-blur-md rounded-3xl p-8 hover:border-sky-500/50 hover:bg-white/[0.04] transition-all duration-300 shadow-xl flex flex-col justify-between">
-                        <div className="space-y-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <h3 className="text-xl font-bold text-white group-hover:text-sky-400 transition-colors">{item.title}</h3>
-                            <span className="text-[10px] font-mono bg-white/10 px-3 py-1 rounded-full text-slate-300 whitespace-nowrap">{item.duration_or_date}</span>
+                  
+                  {/* Mobile: Horizontal Scroll | Desktop: Grid */}
+                  <div className="flex overflow-x-auto md:grid md:grid-cols-2 gap-4 md:gap-6 pb-6 md:pb-0 snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {(backendData[sec] || []).map((item) => {
+                      return (
+                        <div 
+                            key={item.id} 
+                            onClick={() => setViewingNode({...item, _category: sec})}
+                            className="min-w-[85vw] md:min-w-0 snap-center group cursor-pointer border border-white/10 bg-white/[0.02] backdrop-blur-md rounded-2xl md:rounded-3xl p-6 md:p-8 hover:border-sky-500/50 hover:bg-white/[0.04] transition-all duration-300 shadow-xl hover:-translate-y-2 flex flex-col justify-between"
+                        >
+                          <div className="space-y-3 md:space-y-4 pointer-events-none">
+                            {item.image_urls && item.image_urls.length > 0 && (
+                              <div className="w-full h-32 md:h-40 rounded-xl overflow-hidden mb-3 md:mb-4 border border-white/10 relative">
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
+                                  <img src={item.image_urls[0]} alt="Project Preview" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                              </div>
+                            )}
+                            <div className="flex items-start justify-between gap-3 md:gap-4">
+                              <h3 className="text-base md:text-xl font-bold text-white group-hover:text-sky-400 transition-colors line-clamp-2">{item.title}</h3>
+                              <span className="text-[9px] md:text-[10px] font-mono bg-white/10 px-2 py-1 md:px-3 md:py-1 rounded-full text-slate-300 whitespace-nowrap flex-shrink-0">{item.duration_or_date}</span>
+                            </div>
+                            <p className="text-xs md:text-sm font-semibold text-indigo-400">{item.organization_or_issuer}</p>
+                            <p className="text-xs md:text-sm text-slate-400 leading-relaxed line-clamp-3">{item.description}</p>
                           </div>
-                          <p className="text-sm font-semibold text-indigo-400">{item.organization_or_issuer}</p>
-                          {item.tag_or_skills_mapped && <p className="text-[11px] text-slate-400 font-mono bg-black/40 inline-block px-2 py-1 rounded">Tech: {item.tag_or_skills_mapped}</p>}
-                          <p className="text-sm text-slate-400 leading-relaxed whitespace-pre-line">{item.description}</p>
+                          
+                          <div className="mt-4 md:mt-6 flex justify-end pt-3 md:pt-4 border-t border-white/5 pointer-events-none">
+                              <span className="text-[10px] md:text-xs font-bold text-sky-500 group-hover:translate-x-2 transition-transform">View Details ↗</span>
+                          </div>
                         </div>
-                        
-                        {/* SMART LINKS RENDER */}
-                        <div className="mt-6 flex flex-wrap gap-3 pt-4 border-t border-white/5">
-                          {item.smart_links && item.smart_links.length > 0 ? (
-                            item.smart_links.map((link, idx) => (
-                              <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/30 px-3 py-1.5 rounded-lg text-xs font-bold text-sky-400 hover:bg-sky-500/20 hover:scale-105 transition-all">
-                                {link.label} ↗
-                              </a>
-                            ))
-                          ) : item.external_redirection_link ? (
-                            <a href={item.external_redirection_link} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-400 hover:text-sky-400 underline decoration-sky-500/30 underline-offset-4 transition-colors">View Resource ↗</a>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               );
@@ -444,124 +546,161 @@ function App() {
         ) : !isAuthenticated ? (
           
           /* ================= VIEW 2: LOGIN ================= */
-          <div className="max-w-md mx-auto my-32 border border-white/10 bg-[#050505]/80 rounded-[2rem] p-10 shadow-2xl backdrop-blur-2xl relative overflow-hidden">
+          <div className="max-w-md mx-auto my-20 md:my-32 border border-white/10 bg-[#050505]/80 rounded-[2rem] p-8 md:p-10 shadow-2xl backdrop-blur-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500" />
-            <div className="text-center space-y-2 mb-10">
-              <h2 className="text-2xl font-bold text-white tracking-tight">System Login</h2>
-              <p className="text-xs font-mono text-slate-500">Authenticate for Master Control.</p>
+            <div className="text-center space-y-2 mb-8 md:mb-10">
+              <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">System Login</h2>
             </div>
-            <form onSubmit={handleLoginSubmit} className="space-y-5">
-              <input type="text" value={username} required onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white focus:border-sky-500 outline-none transition-colors" />
-              <input type="password" value={password} required onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white focus:border-sky-500 outline-none transition-colors" />
-              <button type="submit" className="w-full bg-white text-black hover:bg-slate-200 font-bold text-sm py-4 rounded-xl transition-colors mt-4">Authorize Access</button>
+            <form onSubmit={handleLoginSubmit} className="space-y-4 md:space-y-5">
+              <input type="text" value={username} required onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 md:py-3.5 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
+              <input type="password" value={password} required onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 md:py-3.5 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
+              <button type="submit" className="w-full bg-white text-black hover:bg-slate-200 font-bold text-xs md:text-sm py-3.5 md:py-4 rounded-xl transition-colors mt-2 md:mt-4">Authorize Access</button>
             </form>
           </div>
         ) : (
           
           /* ================= VIEW 3: ADMIN HUB ================= */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
-             
-             {/* PROFILE CONTROL */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 animate-fadeIn relative z-10">
              <div className="lg:col-span-1 space-y-6">
-               <div className="border border-white/10 bg-[#050505]/60 backdrop-blur-2xl rounded-3xl p-6 space-y-6 shadow-xl">
-                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">Profile Configuration</h2>
-                 
-                 {/* DIRECT IMAGE UPLOAD */}
+               <div className="border border-white/10 bg-[#050505]/60 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-5 md:p-6 space-y-6 shadow-xl">
+                 <h2 className="text-xs md:text-sm font-bold text-white uppercase tracking-widest">Profile Matrix</h2>
                  <div className="p-4 border border-dashed border-white/20 rounded-2xl bg-white/[0.02] text-center space-y-3">
-                    <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 border-sky-500/30">
-                        {profileForm.display_picture_url ? <img src={profileForm.display_picture_url} alt="DP" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-black flex items-center justify-center text-2xl">👤</div>}
+                    <div className="w-14 h-14 md:w-16 md:h-16 mx-auto rounded-full overflow-hidden border-2 border-sky-500/30">
+                        {profileForm.display_picture_url ? <img src={profileForm.display_picture_url} alt="DP" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-black flex items-center justify-center text-xl md:text-2xl">👤</div>}
                     </div>
                     <div>
-                        <label className="cursor-pointer bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors inline-block">
-                            {isUploading ? "Uploading..." : "Upload New Photo"}
-                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isUploading} />
+                        <label className="cursor-pointer bg-sky-600 hover:bg-sky-500 text-white text-[9px] md:text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 md:px-4 md:py-2 rounded-lg transition-colors inline-block">
+                            {isUploadingDP ? "Uploading..." : "Upload New Photo"}
+                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'dp')} className="hidden" disabled={isUploadingDP} />
                         </label>
-                        <p className="text-[9px] text-slate-500 mt-2 font-mono">Direct Cloud Sync</p>
                     </div>
                  </div>
 
                  <form onSubmit={handleProfileSubmit} className="space-y-4">
-                   {['full_name', 'professional_title', 'location', 'current_status', 'phone_number', 'whatsapp_link', 'skills_list', 'languages_known'].map((field) => (
+                   <div className="p-3 md:p-4 bg-sky-900/10 border border-sky-500/30 rounded-xl space-y-3">
+                       <h3 className="text-[9px] md:text-[10px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></div>Master CV Details</h3>
+                       <input type="text" placeholder="CV Download Link (e.g. Google Drive)" value={profileForm.master_cv_url || ''} onChange={(e) => setProfileForm({...profileForm, master_cv_url: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
+                       <textarea rows={3} placeholder="Paste raw CV Text here for RAG Brain ingestion..." value={profileForm.master_cv_text || ''} onChange={(e) => setProfileForm({...profileForm, master_cv_text: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none resize-none transition-colors" />
+                   </div>
+
+                   {['full_name', 'professional_title', 'location', 'phone_number', 'whatsapp_link', 'skills_list'].map((field) => (
                      <div key={field} className="space-y-1">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase">{field.replace(/_/g, ' ')}</label>
-                       <input type="text" value={profileForm[field] || ''} onChange={(e) => setProfileForm({...profileForm, [field]: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none transition-colors" />
+                       <label className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase">{field.replace(/_/g, ' ')}</label>
+                       <input type="text" value={profileForm[field] || ''} onChange={(e) => setProfileForm({...profileForm, [field]: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
                      </div>
                    ))}
-                   <textarea rows={4} value={profileForm.profile_summary || ''} onChange={(e) => setProfileForm({...profileForm, profile_summary: e.target.value})} placeholder="Professional Summary" className="w-full bg-black border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-sky-500 outline-none resize-none transition-colors" />
-                   <button type="submit" className="w-full bg-white text-black font-bold text-sm py-3 rounded-xl hover:bg-slate-200 transition-colors">Commit Profile Data</button>
+                   
+                   {/* Instagram Admin Field added securely */}
+                   <div className="space-y-1">
+                       <label className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase">Instagram Link</label>
+                       <input type="url" value={socialForm.instagram || ''} onChange={(e) => setSocialForm({...socialForm, instagram: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
+                   </div>
+
+                   <textarea rows={4} value={profileForm.profile_summary || ''} onChange={(e) => setProfileForm({...profileForm, profile_summary: e.target.value})} placeholder="Professional Summary" className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none resize-none transition-colors" />
+                   
+                   {/* FIXED: Family Details Form Highlighted Box */}
+                   <div className="p-3 md:p-4 bg-indigo-900/10 border border-indigo-500/30 rounded-xl space-y-3">
+                       <h3 className="text-[9px] md:text-[10px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>Family & Private Narrative</h3>
+                       <textarea rows={3} value={profileForm.family_narrative || ''} onChange={(e) => setProfileForm({...profileForm, family_narrative: e.target.value})} placeholder="Enter Family Details & Background Narrative here..." className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-indigo-500 outline-none resize-none transition-colors" />
+                   </div>
+
+                   <button type="submit" className="w-full bg-white text-black font-bold text-xs md:text-sm py-2.5 md:py-3 rounded-lg md:rounded-xl hover:bg-slate-200 transition-colors">Sync Master Data</button>
                  </form>
                </div>
              </div>
 
-             <div className="lg:col-span-2 space-y-8">
-                {/* PUBLISH / EDIT NODE FORM */}
-                <div className={`border border-white/10 ${editingNode ? 'bg-sky-900/10 border-sky-500/50' : 'bg-[#050505]/60'} backdrop-blur-2xl rounded-3xl p-6 md:p-8 space-y-6 shadow-xl transition-all duration-300`}>
+             <div className="lg:col-span-2 space-y-6 md:space-y-8 relative z-10">
+                <div className={`border border-white/10 ${editingNode ? 'bg-sky-900/10 border-sky-500/50' : 'bg-[#050505]/60'} backdrop-blur-2xl rounded-2xl md:rounded-3xl p-5 md:p-8 space-y-5 md:space-y-6 shadow-xl transition-all duration-300`}>
                   <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                          {editingNode ? <><div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> Editing Node Mode</> : 'Publish Data Node'}
+                      <h2 className="text-xs md:text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                          {editingNode ? <><div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> Editing Mode</> : 'Add New Portfolio Entry'}
                       </h2>
-                      {editingNode && <button type="button" onClick={cancelEdit} className="text-xs font-bold text-slate-400 hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">Cancel Edit ✕</button>}
+                      {editingNode && <button type="button" onClick={cancelEdit} className="text-[10px] md:text-xs font-bold text-slate-400 hover:text-white transition-colors bg-white/5 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-white/10">Cancel Edit ✕</button>}
                   </div>
                   
-                  <form onSubmit={handleItemSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <select value={itemForm.category} disabled={editingNode} onChange={(e) => setItemForm({...itemForm, category: e.target.value})} className="md:col-span-2 bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors disabled:opacity-50">
+                  <form onSubmit={handleItemSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 relative z-20">
+                    <select value={itemForm.category} disabled={editingNode} onChange={(e) => setItemForm({...itemForm, category: e.target.value})} className="md:col-span-2 bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors disabled:opacity-50">
                       <option value="projects">Engineering Projects</option>
                       <option value="experiences">Professional Experience</option>
                       <option value="education">Academic Qualifications</option>
                       <option value="certifications_and_achievements">Certifications & Awards</option>
                     </select>
-                    <input type="text" placeholder="Title" value={itemForm.title} required onChange={(e) => setItemForm({...itemForm, title: e.target.value})} className="bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                    <input type="text" placeholder="Organization / Issuer" value={itemForm.organization_or_issuer} onChange={(e) => setItemForm({...itemForm, organization_or_issuer: e.target.value})} className="bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                    <input type="text" placeholder="Duration (e.g., 2023 - Present)" value={itemForm.duration_or_date} onChange={(e) => setItemForm({...itemForm, duration_or_date: e.target.value})} className="bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                    <input type="text" placeholder="Skills Mapped (Comma separated)" value={itemForm.tag_or_skills_mapped} onChange={(e) => setItemForm({...itemForm, tag_or_skills_mapped: e.target.value})} className="bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                    <textarea rows={4} placeholder="Detailed Description Block" value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="md:col-span-2 bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-sky-500 resize-none transition-colors" />
                     
-                    {/* SMART LINKS */}
-                    <div className="md:col-span-2 bg-black/40 p-5 rounded-2xl border border-white/5 space-y-4">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="md:col-span-2 bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-dashed border-white/20 space-y-3 md:space-y-4">
+                        <label className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div> Attach Visual Assets
+                            </div>
+                            <label className="cursor-pointer bg-white/10 hover:bg-white/20 text-white text-[9px] md:text-[10px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-lg transition-colors">
+                                {isUploadingItemImg ? "Uploading..." : "+ Upload Image"}
+                                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'item')} className="hidden" disabled={isUploadingItemImg} />
+                            </label>
+                        </label>
+                        <div className="flex flex-wrap gap-2 md:gap-3">
+                            {itemForm.image_urls && itemForm.image_urls.length > 0 ? (
+                                itemForm.image_urls.map((imgUrl, idx) => (
+                                    <div key={idx} className="relative w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border border-white/20 group">
+                                        <img src={imgUrl} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => removeUploadedImage(idx)} className="absolute inset-0 bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] md:text-xs font-bold">Remove</button>
+                                    </div>
+                                ))
+                            ) : <p className="text-[10px] md:text-xs text-slate-500 font-mono">No images attached yet.</p>}
+                        </div>
+                    </div>
+
+                    <input type="text" placeholder="Title" value={itemForm.title} required onChange={(e) => setItemForm({...itemForm, title: e.target.value})} className="bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                    <input type="text" placeholder="Organization / Issuer" value={itemForm.organization_or_issuer} onChange={(e) => setItemForm({...itemForm, organization_or_issuer: e.target.value})} className="bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                    <input type="text" placeholder="Duration (e.g., 2023 - Present)" value={itemForm.duration_or_date} onChange={(e) => setItemForm({...itemForm, duration_or_date: e.target.value})} className="bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                    <input type="text" placeholder="Skills Mapped" value={itemForm.tag_or_skills_mapped} onChange={(e) => setItemForm({...itemForm, tag_or_skills_mapped: e.target.value})} className="bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                    <textarea rows={4} placeholder="Detailed Description Block (Public)" value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="md:col-span-2 bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-white outline-none focus:border-sky-500 resize-none transition-colors" />
+                    
+                    {/* HIDDEN README FIELD */}
+                    <textarea rows={3} placeholder="Hidden Readme Context (Only for AI Brain)" value={itemForm.hidden_readme || ''} onChange={(e) => setItemForm({...itemForm, hidden_readme: e.target.value})} className="md:col-span-2 bg-sky-900/10 border border-sky-500/30 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm text-sky-100 outline-none focus:border-sky-500 resize-none transition-colors" />
+
+                    <div className="md:col-span-2 bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-white/5 space-y-3 md:space-y-4">
+                        <label className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Smart Links Configuration
                         </label>
                         <div className="flex flex-col sm:flex-row gap-2">
-                            <input type="text" placeholder="Label (e.g. GitHub)" value={tempLink.label} onChange={(e) => setTempLink({...tempLink, label: e.target.value})} className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                            <input type="url" placeholder="URL Link" value={tempLink.url} onChange={(e) => setTempLink({...tempLink, url: e.target.value})} className="flex-[2] bg-black border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-sky-500 transition-colors" />
-                            <button type="button" onClick={addSmartLink} className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-6 py-2.5 rounded-xl transition-colors">Add</button>
+                            <input type="text" placeholder="Label (e.g. GitHub)" value={tempLink.label} onChange={(e) => setTempLink({...tempLink, label: e.target.value})} className="flex-1 bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                            <input type="url" placeholder="URL Link" value={tempLink.url} onChange={(e) => setTempLink({...tempLink, url: e.target.value})} className="flex-[2] bg-black border border-white/10 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm text-white outline-none focus:border-sky-500 transition-colors" />
+                            <button type="button" onClick={addSmartLink} className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 md:px-6 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-colors">Add</button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {itemForm.smart_links && itemForm.smart_links.map((lnk, idx) => (
-                                <span key={idx} className="flex items-center gap-2 bg-white/5 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-full border border-white/10">
-                                    {lnk.label} <button type="button" onClick={() => removeSmartLink(idx)} className="text-red-400 hover:text-red-300 ml-1">✕</button>
+                                <span key={idx} className="flex items-center gap-2 bg-white/5 text-slate-200 text-[10px] md:text-xs font-semibold px-2 md:px-3 py-1 md:py-1.5 rounded-full border border-white/10 group cursor-pointer" title="Click 'X' to remove">
+                                    {lnk.label} <button type="button" onClick={() => removeSmartLink(idx)} className="text-red-400 hover:text-red-300 ml-1 font-bold group-hover:scale-125 transition-transform">✕</button>
                                 </span>
                             ))}
                         </div>
                     </div>
 
-                    <button type="submit" className={`md:col-span-2 ${editingNode ? 'bg-amber-500 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'bg-sky-600 hover:bg-sky-500 shadow-[0_0_20px_rgba(2,132,199,0.3)]'} text-white font-bold text-sm py-4 rounded-xl transition-colors`}>
-                        {editingNode ? "Update Existing Node" : "Inject Node into Database"}
+                    <button type="submit" className={`md:col-span-2 ${editingNode ? 'bg-amber-500 hover:bg-amber-400' : 'bg-sky-600 hover:bg-sky-500'} text-white font-bold text-xs md:text-sm py-3.5 md:py-4 rounded-lg md:rounded-xl transition-colors`}>
+                        {editingNode ? "Save Edited Entry" : "Save New Entry"}
                     </button>
                   </form>
                 </div>
 
-                {/* ACTIVE DATABASE RECORDS */}
-                <div className="border border-white/10 bg-[#050505]/60 backdrop-blur-2xl rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
-                  <h2 className="text-sm font-bold text-white uppercase tracking-widest flex items-center justify-between">
-                      Active Data Nodes
-                      <span className="text-[10px] text-slate-500">Manage Content</span>
+                <div className="border border-white/10 bg-[#050505]/60 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-5 md:p-8 space-y-5 md:space-y-6 shadow-xl relative z-20">
+                  <h2 className="text-xs md:text-sm font-bold text-white uppercase tracking-widest flex items-center justify-between">
+                      Manage Portfolio Content
+                      <span className="text-[9px] md:text-[10px] text-slate-500">Edit / Remove</span>
                   </h2>
                   {['education', 'projects', 'experiences', 'certifications_and_achievements'].map((category) => {
                     if (!backendData || !backendData[category] || backendData[category].length === 0) return null;
                     return (
-                      <div key={`manage-${category}`} className="space-y-3 pt-4 border-t border-white/5">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-sky-500">{category.replace(/_/g, ' ')}</span>
+                      <div key={`manage-${category}`} className="space-y-2 md:space-y-3 pt-3 md:pt-4 border-t border-white/5">
+                        <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-sky-500">{category.replace(/_/g, ' ')}</span>
                         <div className="space-y-2">
                           {backendData[category].map((node) => (
-                            <div key={node.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-black p-4 rounded-xl border border-white/5 group hover:border-sky-500/30 transition-colors gap-3">
-                              <div className="truncate max-w-[70%]">
-                                  <p className="text-sm text-slate-200 font-bold truncate">{node.title}</p>
-                                  <p className="text-[10px] text-slate-500 truncate font-mono">{node.organization_or_issuer}</p>
+                            <div key={node.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-black p-3 md:p-4 rounded-xl border border-white/5 group hover:border-sky-500/30 transition-colors gap-2 md:gap-3">
+                              <div className="truncate w-full sm:max-w-[65%]">
+                                  <p className="text-xs md:text-sm text-slate-200 font-bold truncate">{node.title}</p>
+                                  <p className="text-[9px] md:text-[10px] text-slate-500 truncate font-mono">{node.organization_or_issuer}</p>
                               </div>
-                              <div className="flex items-center gap-2 w-full sm:w-auto">
-                                <button type="button" onClick={() => triggerEditNode(category, node)} className="flex-1 sm:flex-none text-amber-400 hover:text-white border border-amber-900/50 hover:bg-amber-900/50 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors">Edit</button>
-                                <button type="button" onClick={() => handleDeleteNode(category, node)} className="flex-1 sm:flex-none text-red-400 hover:text-white border border-red-900/50 hover:bg-red-900 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors">Purge</button>
+                              <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                <button type="button" onClick={(e) => triggerEditNode(category, node, e)} className="flex-1 sm:flex-none text-amber-400 hover:text-white border border-amber-900/50 hover:bg-amber-900/50 px-3 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-colors">Edit</button>
+                                <button type="button" onClick={(e) => handleDeleteNode(category, node.id, e)} className="flex-1 sm:flex-none text-red-400 hover:text-white border border-red-900/50 hover:bg-red-900 px-3 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-colors">Remove</button>
                               </div>
                             </div>
                           ))}
@@ -575,57 +714,107 @@ function App() {
         )}
       </main>
 
-      {/* TESTING TERMINAL (Crash-Proof TTS) */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        {!isChatOpen && (
-          <button onClick={() => setIsChatOpen(true)} className="group relative h-14 w-14 rounded-full bg-black border border-white/10 text-2xl flex items-center justify-center shadow-[0_0_30px_rgba(14,165,233,0.15)] hover:scale-105 hover:border-sky-500/50 transition-all">
-            🤖
-            <span className="absolute -top-10 right-0 bg-sky-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap tracking-wider uppercase shadow-xl">Query Agent</span>
-          </button>
-        )}
+      {/* ========================================================= */}
+      {/* 🚀 FIXED: FLOATING AI TOGGLE BUTTON WITH IMPRESSIVE CTA 🚀 */}
+      {/* ========================================================= */}
+      {!isChatOpen && currentView === 'portfolio' && (
+         <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[100] flex items-center gap-3 md:gap-4 animate-fadeIn">
+             <div className="flex bg-sky-500/10 border border-sky-500/30 text-sky-400 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold tracking-widest backdrop-blur-md shadow-[0_0_15px_rgba(14,165,233,0.3)] animate-pulse shadow-sky-500/20">
+                 Talk to AI Twin →
+             </div>
+             <button onClick={() => setIsChatOpen(true)} className="bg-sky-600 hover:bg-sky-500 text-white w-12 h-12 md:w-14 md:h-14 rounded-full shadow-[0_0_20px_rgba(14,165,233,0.5)] flex items-center justify-center transition-transform hover:scale-110 border border-white/20">
+                 <span className="text-xl md:text-2xl">💬</span>
+             </button>
+         </div>
+      )}
 
-        {isChatOpen && (
-          <div className="w-80 md:w-[420px] h-[550px] bg-[#020202]/95 backdrop-blur-3xl border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-fadeIn">
-            <div className="bg-white/[0.02] px-6 py-5 flex items-center justify-between border-b border-white/5">
-              <div className="flex flex-col">
-                  <span className="text-xs font-extrabold text-white flex items-center gap-2 uppercase tracking-widest">
-                    <div className={`w-2 h-2 rounded-full ${isSpeaking ? 'bg-sky-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} /> 
-                    {isSpeaking ? 'AI is Speaking...' : 'AI Assistant Active'}
-                  </span>
-                  <span className="text-[9px] text-slate-500 font-mono mt-1">Pre-Avatar Integration Phase</span>
+      {/* ========================================================= */}
+      {/* 🚀 RESPONSIVE PREMIUM WIDGET (PC: Split View, Mobile: Fullscreen Modal) 🚀 */}
+      {/* ========================================================= */}
+      <div className={`fixed z-[200] transform transition-all duration-300 flex flex-col overflow-hidden bg-[#0a0a0a]/95 backdrop-blur-3xl 
+          ${isChatOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 pointer-events-none translate-y-10'}
+          /* MOBILE: Fullscreen Absolute Cover */
+          inset-0 w-full h-full rounded-none
+          /* DESKTOP: Bottom Right Split Window */
+          md:inset-auto md:bottom-10 md:right-10 md:w-[650px] md:h-[450px] md:border md:border-white/10 md:rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.9)]`}>
+          
+          {/* Header Row */}
+          <div className="flex items-center justify-between p-3 md:p-3 border-b border-white/10 bg-[#111] flex-shrink-0 h-12 md:h-12 relative z-50">
+              <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></div>
+                  <span className="text-[10px] md:text-xs font-bold text-white tracking-widest uppercase">Digital Twin Agent</span>
               </div>
-              <div className="flex items-center gap-4">
-                  {/* SAFE AUDIO TOGGLE BUTTON */}
-                  <button type="button" onClick={toggleMute} className={`text-xs px-2 py-1 rounded border ${isAudioEnabled ? 'border-sky-500/50 text-sky-400 bg-sky-500/10' : 'border-slate-500/50 text-slate-500 bg-black'}`}>
-                      {isAudioEnabled ? '🔊 ON' : '🔇 MUTE'}
+              <div className="flex items-center gap-2">
+                  <button onClick={toggleAudio} className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors border ${!isAudioEnabled ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'}`}>
+                      {isAudioEnabled ? '🔊' : '🔇'}
                   </button>
-                  <button type="button" onClick={() => setIsChatOpen(false)} className="text-slate-500 hover:text-white transition-colors">✕</button>
+                  <button onClick={() => setIsChatOpen(false)} className="flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-red-500/80 text-white rounded-md transition-colors border border-white/10">
+                      ✕
+                  </button>
               </div>
-            </div>
-
-            <div className="flex-1 p-5 overflow-y-auto space-y-5">
-              {chatHistory.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] px-5 py-3.5 text-sm leading-relaxed shadow-lg ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-2xl rounded-br-sm' : 'bg-white/[0.04] border border-white/5 text-slate-300 rounded-2xl rounded-bl-sm font-light'}`}>
-                    {/* NATIVE RENDERER USED HERE (No Markdown Crashes) */}
-                    {msg.role === 'user' ? String(msg.text) : formatAiResponse(msg.text)}
-                  </div>
-                </div>
-              ))}
-              {isAiTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-white/[0.04] border border-white/5 text-sky-400 text-xs font-mono rounded-2xl rounded-bl-sm px-5 py-3 animate-pulse">Thinking...</div>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={triggerChatRequest} className="p-4 bg-black/50 border-t border-white/5 flex gap-2">
-              <input type="text" value={chatQuestion} onChange={(e) => setChatQuestion(e.target.value)} placeholder="Ask anything about Salik..." className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors" />
-              <button type="submit" className="bg-white text-black hover:bg-slate-200 font-bold text-sm px-5 rounded-xl transition-colors">Send</button>
-            </form>
           </div>
-        )}
+          
+          {/* RESPONSIVE LAYOUT CONTAINER */}
+          <div className="flex flex-col md:flex-row flex-1 overflow-hidden h-[calc(100%-3rem)]">
+              
+              {/* VIDEO AREA: Mobile = Top Block (Perfect Ratio, No cut head), Desktop = Left Sidebar */}
+              <div className="w-full h-[40vh] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0 flex items-center justify-center overflow-hidden">
+                  <video src={idleVideo} autoPlay loop muted playsInline className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-700 ${showIdle ? 'opacity-100' : 'opacity-0'}`} />
+                  
+                  {/* ADDED preload="none" TO FIX PAGESPEED PERFORMANCE SCORE */}
+                  <video ref={thinkingRef} src={thinkingVideo} preload="none" loop={false} muted playsInline onEnded={handleThinkingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-500 ${showThinking ? 'opacity-100' : 'opacity-0'}`} />
+                  <video ref={speakingRef} src={speakingVideo} preload="none" loop={aiState === 'answering'} muted={aiState === 'answering'} playsInline onEnded={handleSpeakingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-200 ${showSpeaking ? 'opacity-100' : 'opacity-0'}`} />
+                  
+                  {/* Premium Fade to mask harsh video edges on mobile */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent pointer-events-none z-10" />
+              </div>
+
+              {/* CHAT AREA */}
+              <div className="flex-1 flex flex-col h-full bg-[#050505]">
+                  {/* Scrollable Log */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#050505]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {aiState === 'standby' && (
+                          <div className="h-full flex flex-col items-center justify-center text-center space-y-2 md:space-y-3 opacity-60">
+                              <span className="text-2xl md:text-3xl">✨</span>
+                              <p className="text-[10px] md:text-[11px] font-medium text-slate-300 leading-relaxed px-4">
+                                  Digital Twin Offline.<br/>
+                                  <span className="text-slate-500 text-[9px] md:text-[10px]">Tap 'Start Session' to initiate AI interaction.</span>
+                              </p>
+                          </div>
+                      )}
+                      {chatHistory.map((chat, idx) => (
+                          <div key={idx} className={`max-w-[90%] rounded-xl p-3 text-[11px] md:text-[12px] leading-relaxed shadow-lg ${chat.role === 'user' ? 'bg-sky-600 text-white self-end rounded-br-sm ml-auto' : 'bg-[#151515] border border-white/5 text-slate-200 self-start rounded-bl-sm mr-auto'}`}>
+                              {chat.text}
+                          </div>
+                      ))}
+                      {['thinking', 'answering'].includes(aiState) && (
+                          <div className="max-w-[85%] bg-[#151515] border border-white/5 text-slate-400 self-start rounded-xl p-2 md:p-3 text-[9px] md:text-[10px] rounded-bl-sm mr-auto flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse"></div> Receiving...
+                          </div>
+                      )}
+                      <div ref={chatEndRef} />
+                  </div>
+
+                  {/* Input Block */}
+                  <div className="p-3 md:p-4 border-t border-white/10 bg-[#0a0a0a] flex-shrink-0">
+                      {aiState === 'standby' ? (
+                          <button onClick={startIntroSequence} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold uppercase tracking-widest text-[11px] py-3.5 rounded-lg shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all">
+                              Start Session
+                          </button>
+                      ) : (
+                          <form onSubmit={triggerAiQuery} className="relative flex items-center">
+                              <input type="text" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} disabled={['intro', 'thinking', 'answering'].includes(aiState)} placeholder="Ask Salik's Twin..." className="w-full bg-[#111] border border-white/10 focus:border-sky-500/50 rounded-lg pl-4 pr-12 py-3 text-xs text-white outline-none transition-all placeholder:text-slate-600 disabled:opacity-50" />
+                              <button type="submit" disabled={!userQuery.trim() || ['intro', 'thinking', 'answering'].includes(aiState)} className="absolute right-1.5 w-8 h-8 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center hover:bg-sky-500 hover:text-black transition-all disabled:opacity-0">
+                                  <span className="font-bold text-base">↗</span>
+                              </button>
+                          </form>
+                      )}
+                  </div>
+              </div>
+
+          </div>
       </div>
+      
     </div>
   );
 }
