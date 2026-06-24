@@ -55,7 +55,12 @@ CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
 # Core Intelligence Engine (Stabilized for Groq Llama-3 - Production Grade)
 llm = ChatGroq(
-    model="llama3-8b-8192", 
+    # model="llama3-8b-8192", 
+    # Purani line (Ise hata de):
+# model="llama3-8b-8192", 
+
+# Nayi line (Ise daal):
+    model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.6, # Optimized for high technical precision and fluid narrative
     max_retries=3    # Built-in Langchain retries
