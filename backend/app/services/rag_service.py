@@ -8,6 +8,7 @@ import re
 import time
 from datetime import date
 
+
 # ==========================================
 # THE ASSASSIN PROTOCOL: TELEMETRY KILL SWITCH
 # ==========================================
@@ -39,7 +40,8 @@ else:
     print("🚨 FATAL ERROR: Gemini/Google API KEY MISSING FROM ENVIRONMENT!")
 
 from app.services.storage_service import get_complete_portfolio
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_groq import ChatGroq # ADDED GROQ IMPORT
 from langchain_core.documents import Document
 from langchain_chroma import Chroma 
 
@@ -51,10 +53,10 @@ embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", goo
 vector_store_dir = os.path.join(os.path.dirname(__file__), "../vector_store")
 CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 
-# Core Intelligence Engine (Stabilized for Gemini 1.5 Flash - Production Grade)
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash", 
-    google_api_key=gemini_api_key,
+# Core Intelligence Engine (Stabilized for Groq Llama-3 - Production Grade)
+llm = ChatGroq(
+    model="llama3-8b-8192", 
+    api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.6, # Optimized for high technical precision and fluid narrative
     max_retries=3    # Built-in Langchain retries
 ) 
@@ -212,17 +214,17 @@ def query_rag_brain(user_question):
     """
     
     # ---------------------------------------------------------
-    # ROBUST FALLBACK & RETRY MECHANISM (Strictly uses Gemini 1.5 Flash)
+    # ROBUST FALLBACK & RETRY MECHANISM (Strictly uses Groq Llama-3)
     # ---------------------------------------------------------
     # Retries ensure stability against temporary rate limits or failures.
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Invokes the Gemini 1.5 Flash stabilized Intelligence Engine
+            # Invokes the Groq Llama-3 stabilized Intelligence Engine
             response = llm.invoke(prompt)
             return response.content
         except Exception as e:
-            logging.error(f"Gemini API Error (Attempt {attempt + 1}/{max_retries}): {e}")
+            logging.error(f"Groq API Error (Attempt {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
                 # Professional fallback only after all retries fail.
                 return "My neural network is currently optimizing a massive data stream. Please give me a moment and try asking again."
