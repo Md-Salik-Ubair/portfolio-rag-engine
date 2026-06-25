@@ -33,7 +33,6 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]); 
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false); 
-  // Add Mobile Menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Upload, Edit & Modal States
@@ -59,15 +58,38 @@ function App() {
   });
   const [tempLink, setTempLink] = useState({ label: '', url: '' });
 
-  // Auto-scroll chat log flawlessly
+  // ---------------------------------------------------------
+  // CORE EVENT LISTENERS (Back Button Hardware Fix & Scroll)
+  // ---------------------------------------------------------
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory.length, aiState]);
 
+  // Fix hardware "Back" button closing the whole app when viewing a node
+  useEffect(() => {
+    const handlePopState = (e) => {
+        if (viewingNode) {
+            e.preventDefault();
+            setViewingNode(null); 
+        } else if (isChatOpen) {
+            e.preventDefault();
+            setIsChatOpen(false); 
+        }
+    };
+    
+    if (viewingNode || isChatOpen) {
+        window.history.pushState(null, "", window.location.href);
+    }
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [viewingNode, isChatOpen]);
+
+
   // ---------------------------------------------------------
-  // CORE API FETCHING (CRASH PROOF)
+  // CORE API FETCHING 
   // ---------------------------------------------------------
   const refreshPortfolioData = () => {
     fetch(`${API_BASE_URL}/api/portfolio/data`)
@@ -213,7 +235,7 @@ function App() {
   };
 
   // ==========================================
-  // SMART UI: AUTO-SCROLL FUNCTION
+  // SMART UI: AUTO-SCROLL FUNCTION 
   // ==========================================
   const handleSmartScroll = (text) => {
       const lowerText = text.toLowerCase();
@@ -221,42 +243,53 @@ function App() {
           const section = document.getElementById('section-projects');
           if(section) {
               section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              setIsChatOpen(false); // Close chat to see the section on mobile
           }
       } else if (lowerText.includes('experience') || lowerText.includes('worked')) {
           const section = document.getElementById('section-experiences');
           if(section) {
               section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              setIsChatOpen(false);
           }
       } else if (lowerText.includes('education') || lowerText.includes('degree') || lowerText.includes('study')) {
           const section = document.getElementById('section-education');
           if(section) {
               section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              setIsChatOpen(false);
           }
       } else if (lowerText.includes('certification') || lowerText.includes('award')) {
           const section = document.getElementById('section-certifications_and_achievements');
           if(section) {
               section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              setIsChatOpen(false);
           }
       }
   }
 
   // ==========================================
-  // VIRTUAL PRESENCE ENGINE (WITH OVERLAP FIX & LOCKS)
+  // VIRTUAL PRESENCE ENGINE (Audio Flow Secured)
   // ==========================================
   const isMuted = !isAudioEnabled;
 
   const stopAllAudio = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    if (audioRef.current) { 
+        audioRef.current.pause(); 
+        audioRef.current.removeAttribute('src'); 
+        audioRef.current.load(); 
+        audioRef.current = null;
+    }
     if (speakingRef.current) { speakingRef.current.pause(); speakingRef.current.currentTime = 0; }
     if (thinkingRef.current) { thinkingRef.current.pause(); thinkingRef.current.currentTime = 0; }
   };
 
   const toggleAudio = () => {
-    setIsAudioEnabled(prev => !prev);
+    setIsAudioEnabled(prev => {
+        const nextState = !prev;
+        if (audioRef.current) audioRef.current.muted = !nextState;
+        if (speakingRef.current) speakingRef.current.muted = !nextState;
+        if (thinkingRef.current) thinkingRef.current.muted = !nextState;
+
+        if (nextState && aiState === 'answering' && speakingRef.current && speakingRef.current.paused) {
+             speakingRef.current.play().catch(e => console.log("Video Play Blocked:", e));
+        }
+        return nextState;
+    });
   };
 
   useEffect(() => {
@@ -266,7 +299,7 @@ function App() {
   }, [isMuted]);
 
   const startIntroSequence = () => {
-    stopAllAudio(); // Force stop before starting intro
+    stopAllAudio(); 
     setAiState('intro');
     const introText = "I am the digital twin of Md Salik Ubair. I can answer questions about his engineering portfolio.";
     setChatHistory([{ role: 'ai', text: introText }]);
@@ -288,8 +321,7 @@ function App() {
   };
 
   const playBackendStream = (data) => {
-    // FORCE STOP any playing audio before starting new response
-    stopAllAudio();
+    stopAllAudio(); 
 
     const responseText = data.ai_response || "Connection established.";
     const audioUrl = data.audio_url;
@@ -297,33 +329,36 @@ function App() {
     const cleanSub = responseText.replace(/[*#`]/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
     setChatHistory(prev => [...prev, { role: 'ai', text: cleanSub }]);
     
-    if (audioUrl && !isMuted) {
+    if (audioUrl) {
         setAiState('answering');
-        const fullAudioUrl = `${API_BASE_URL}${audioUrl}`;
-        const audio = new Audio(fullAudioUrl);
-        audioRef.current = audio;
-        audio.muted = false;
         
-        audio.onplay = () => {
-            if (speakingRef.current) {
+        const fullAudioUrl = `${API_BASE_URL}${audioUrl}?t=${new Date().getTime()}`; 
+        
+        const newAudio = new Audio(fullAudioUrl);
+        audioRef.current = newAudio; 
+        newAudio.muted = isMuted; 
+        
+        newAudio.onplay = () => {
+            if (speakingRef.current && !isMuted) {
                 speakingRef.current.currentTime = 0;
-                speakingRef.current.play().catch(e => console.log(e));
+                speakingRef.current.play().catch(e => console.log("Video Play Blocked:", e));
             }
         };
         
-        audio.onended = () => {
+        newAudio.onended = () => {
             setAiState('idle');
             if (speakingRef.current) speakingRef.current.pause();
-            // Check if we need to smart scroll after speaking ends
             handleSmartScroll(cleanSub);
         };
         
-        audio.onerror = () => {
+        newAudio.onerror = (e) => {
+            console.error("Audio Load Error:", e);
             setAiState('idle');
             handleSmartScroll(cleanSub);
         }
-        audio.play().catch(e => { 
-            console.error("Audio blocked:", e); 
+        
+        newAudio.play().catch(e => { 
+            console.error("Audio AutoPlay blocked:", e); 
             setAiState('idle'); 
             handleSmartScroll(cleanSub);
         });
@@ -342,8 +377,6 @@ function App() {
     setUserQuery('');
     
     setAiState('thinking');
-    
-    // FORCE STOP ANY EXISTING AUDIO/VIDEO BEFORE THINKING
     stopAllAudio(); 
 
     if (thinkingRef.current && !isMuted) {
@@ -399,7 +432,7 @@ function App() {
       <div className="fixed bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
       <div className="fixed inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay"></div>
 
-      {/* 🚀 PREMIUM MSU MONOGRAM NAVBAR (Desktop & Mobile Handled) 🚀 */}
+      {/* 🚀 PREMIUM MSU MONOGRAM NAVBAR 🚀 */}
       <nav className="fixed w-full border-b border-white/5 bg-black/50 backdrop-blur-2xl z-50 px-4 md:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4 group cursor-pointer" onClick={() => handleNavClick('portfolio', 'top')}>
           {/* Abstract Caligraphy M-S-U Symbol */}
@@ -439,20 +472,20 @@ function App() {
 
         {/* Mobile Hamburger Menu Toggle */}
         <div className="lg:hidden flex items-center">
-             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2 text-xl border border-white/10 rounded-md">
+             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2 text-xl hover:text-sky-400 transition-colors">
                  {isMobileMenuOpen ? '✕' : '☰'}
              </button>
         </div>
       </nav>
 
-      {/* Mobile Dropdown Menu */}
+      {/* FIXED: Premium Mobile Dropdown Menu */}
       {isMobileMenuOpen && (
-          <div className="fixed top-16 left-0 w-full bg-black/95 backdrop-blur-3xl border-b border-white/10 z-40 lg:hidden flex flex-col items-center py-4 space-y-4 animate-fadeIn">
+          <div className="fixed top-16 left-0 w-full bg-[#050505]/90 backdrop-blur-xl border-b border-white/10 z-40 lg:hidden flex flex-col p-4 space-y-2 shadow-2xl animate-fadeIn">
               {navLinks.map((link, idx) => (
                   <button 
                       key={idx}
                       onClick={() => handleNavClick(link.view, link.section)}
-                      className="text-sm font-bold uppercase tracking-widest text-slate-300 hover:text-sky-400 w-full text-center py-2"
+                      className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300 hover:text-white hover:bg-white/5 w-full text-left py-4 px-4 rounded-xl transition-all border border-transparent hover:border-white/10"
                   >
                       {link.label}
                   </button>
@@ -546,7 +579,6 @@ function App() {
                   {backendData?.profile_core?.full_name || "Md Salik Ubair"}
                 </h1>
                 
-                {/* Location Integration Restored */}
                 <div className="flex flex-col lg:flex-row items-center lg:items-start gap-2 text-base md:text-xl text-sky-400 font-medium tracking-wide lg:border-l-2 lg:border-indigo-500 lg:pl-4">
                   <span>{backendData?.profile_core?.professional_title || "Update Title in Dashboard"}</span>
                   {backendData?.profile_core?.location && (
@@ -563,14 +595,12 @@ function App() {
                   {backendData?.social_channels?.linkedin && <a href={backendData.social_channels.linkedin} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-sky-400 hover:bg-white/10 transition-colors">LinkedIn ↗</a>}
                   {backendData?.social_channels?.github && <a href={backendData.social_channels.github} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 px-3 py-2 md:px-4 md:py-2 rounded-lg text-slate-300 hover:bg-white/10 transition-colors">GitHub ↗</a>}
                   
-                  {/* WhatsApp Component */}
                   {backendData?.profile_core?.whatsapp_link && (
                     <a href={backendData.profile_core.whatsapp_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 md:px-4 md:py-2 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">
                         💬 WhatsApp
                     </a>
                   )}
 
-                  {/* Instagram Component */}
                   {backendData?.social_channels?.instagram && (
                     <a href={backendData.social_channels.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg hover:opacity-90 transition-opacity font-bold shadow-[0_0_10px_rgba(236,72,153,0.3)]">
                         📸 Instagram
@@ -587,7 +617,6 @@ function App() {
                 )}
               </div>
 
-              {/* OPTIMIZED STATIC DP */}
               <div className="relative w-40 md:w-[250px] lg:w-[300px] flex-shrink-0 z-20 mx-auto">
                   <div className="relative w-full aspect-[4/5] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] bg-black">
                       <img src={backendData?.profile_core?.display_picture_url || avatarImg} alt="Profile" className="w-full h-full object-cover" />
@@ -595,7 +624,6 @@ function App() {
               </div>
             </div>
 
-            {/* SKILLS SECTION WITH BADGES */}
             <div className="border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-6">
               <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Core Technical Stack</h3>
               <div className="flex flex-wrap gap-2">
@@ -619,7 +647,6 @@ function App() {
                      <div className="w-2 h-2 bg-sky-500 rounded-full" /> {displayTitle}
                   </h2>
                   
-                  {/* Mobile: Horizontal Scroll | Desktop: Grid */}
                   <div className="flex overflow-x-auto md:grid md:grid-cols-2 gap-4 md:gap-6 pb-6 md:pb-0 snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {(backendData[sec] || []).map((item) => {
                       return (
@@ -867,7 +894,8 @@ function App() {
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
               
               {/* FIXED AVATAR AREA (Mobile: Top Fixed, Desktop: Left Side) */}
-              <div className="w-full h-[30vh] min-h-[220px] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0">
+              {/* FIXED: Increased mobile height to 45vh and min-h to 300px for a prominent look */}
+              <div className="w-full h-[45vh] min-h-[300px] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0">
                   <video src={idleVideo} autoPlay loop muted playsInline className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-700 ${showIdle ? 'opacity-100' : 'opacity-0'}`} />
                   <video ref={thinkingRef} src={thinkingVideo} preload="none" loop={false} muted playsInline onEnded={handleThinkingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-500 ${showThinking ? 'opacity-100' : 'opacity-0'}`} />
                   <video ref={speakingRef} src={speakingVideo} preload="none" loop={aiState === 'answering'} muted={aiState === 'answering'} playsInline onEnded={handleSpeakingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-200 ${showSpeaking ? 'opacity-100' : 'opacity-0'}`} />
@@ -875,7 +903,7 @@ function App() {
               </div>
 
               {/* CHAT INTERFACE AREA (Fully Scrollable) */}
-              <div className="flex-1 flex flex-col h-[calc(100vh-30vh-3rem)] md:h-full bg-[#050505]">
+              <div className="flex-1 flex flex-col h-[calc(100vh-45vh-3rem)] md:h-full bg-[#050505]">
                   {/* Scrollable Log */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#050505]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       {aiState === 'standby' && (
