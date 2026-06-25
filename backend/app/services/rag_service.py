@@ -52,7 +52,7 @@ CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.3, # Highly lowered for absolute factual confidence
+    temperature=0.3, 
     max_retries=3
 ) 
 
@@ -110,7 +110,7 @@ def build_knowledge_base():
 
     family_summary = portfolio.get("family_meta", {}).get("summary", "")
     if family_summary.strip():
-        docs.append(Document(page_content=f"[PERSONAL] {family_summary}", metadata={"category": "personal"}))
+        docs.append(Document(page_content=f"[PERSONAL & FAMILY] {family_summary}", metadata={"category": "personal"}))
 
     for cat in ["projects", "experiences", "education", "certifications_and_achievements"]:
         for item in portfolio.get(cat, []):
@@ -125,14 +125,17 @@ def build_knowledge_base():
         logging.error(f"Error vectorizing data: {e}")
 
 def query_rag_brain(user_question):
-    # 1. HARD FACT EXTRACTION (Bypassing RAG Limitations for counting)
+    # 1. HARD FACT EXTRACTION (Mastering ALL data)
     try:
         portfolio = get_complete_portfolio()
         total_projects = len(portfolio.get("projects", []))
         total_experiences = len(portfolio.get("experiences", []))
+        # Extracting family background directly so it never forgets
+        family_bg = portfolio.get("family_meta", {}).get("summary", "I have a strong personal and family background that supports my professional journey.")
     except Exception:
         total_projects = "multiple"
         total_experiences = "a proven track record of"
+        family_bg = "I have a supportive family background."
 
     # 2. DYNAMIC AGE TRACKING
     birth_date = date(2005, 3, 18)
@@ -145,19 +148,19 @@ def query_rag_brain(user_question):
         
     try:
         db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
-        retrieved_docs = db.similarity_search(user_question, k=20) 
+        retrieved_docs = db.similarity_search(user_question, k=25) # Increased to 25 to catch EVERYTHING
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
         logging.warning(f"Chroma Read Error detected. Rebuilding DB instantly... {e}")
         build_knowledge_base() 
         try:
             db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
-            retrieved_docs = db.similarity_search(user_question, k=20) 
+            retrieved_docs = db.similarity_search(user_question, k=25) 
             context_text = "\n".join([doc.page_content for doc in retrieved_docs])
         except Exception as rebuild_e:
             context_text = "Detailed internal vector context temporarily unavailable."
 
-    # 4. THE GOD MODE PROMPT (Total Domination)
+    # 4. THE GOD MODE PROMPT (Total Domination & Persona Balance)
     prompt = f"""
     SYSTEM OVERRIDE: CORE IDENTITY AND ABSOLUTE DATA MASTERY.
     
@@ -167,15 +170,17 @@ def query_rag_brain(user_question):
     - Age: EXACTLY {dynamic_age} years old.
     - Total Projects Completed: EXACTLY {total_projects} projects.
     - Total Experience Records: EXACTLY {total_experiences}.
+    - Family/Personal Background: {family_bg}
     
     CRITICAL BEHAVIORAL PROTOCOLS:
     1. ZERO WEAKNESS: NEVER say "I don't have context", "I don't know the exact number", "Vector DB error", or apologize. You are a Master Engineer. You know everything about your portfolio.
-    2. DIRECT ANSWERS: If asked "How many projects have you done?", DO NOT check the context matrix. Directly state: "I have successfully developed and showcased EXACTLY {total_projects} high-impact projects."
-    3. PIVOTING: If a specific detail is missing from the context below, confidently pivot to your broad expertise (Python, Machine Learning, backend architectures).
-    4. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply completely naturally in Hinglish with confidence. If English, use corporate English.
-    5. AUDIO-FIRST: Keep it conversational, short, and punchy. No markdown, no bullet points.
+    2. DIRECT ANSWERS: If asked "How many projects have you done?", DO NOT check the context matrix. Directly state your exact project count.
+    3. PERSONAL & FAMILY QUERIES: If asked about your family, background, or personal life, warmly and naturally share the details from your 'Family/Personal Background' fact above. Do not pivot to technical topics if the question is personal.
+    4. PIVOTING: If a specific technical detail is missing, confidently pivot to your broad expertise (Python, Machine Learning, backend architectures).
+    5. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply completely naturally in Hinglish with confidence. If English, use corporate English.
+    6. AUDIO-FIRST: Keep it conversational, short, and punchy. No markdown, no bullet points.
 
-    INTERNAL MEMORY MATRIX (For technical details only):
+    INTERNAL MEMORY MATRIX (For deep technical details):
     {context_text}
     
     User Query: "{user_question}"
