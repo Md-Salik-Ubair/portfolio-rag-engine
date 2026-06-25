@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine
+# Production-Grade Dynamic RAG Context Engine (Self-Healing & Master Persona)
 import os
 import json
 import logging
@@ -54,7 +54,7 @@ CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.5, # Slightly lowered to ensure strict factual accuracy
+    temperature=0.4, # Lowered slightly for aggressive factual precision
     max_retries=3
 ) 
 
@@ -68,14 +68,13 @@ def clean_text_for_speech(text):
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text) 
     text = re.sub(r'\*(.*?)\*', r'\1', text)     
     text = re.sub(r'#(.*?)\n', r'\1\n', text)    
-    text = re.sub(r'```(.*?)```', '', text, flags=re.DOTALL)
+    text = re.sub(r'```(.*?) কলকাতায়```', '', text, flags=re.DOTALL)
     text = text.replace('`', '').replace('*', '').replace('-', '')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 def generate_audio_sync(text, output_filepath):
     """Generates audio and CLEANS UP old files to prevent storage bloat."""
-    # Auto-Cleanup: Delete old audio files in the directory
     audio_dir = os.path.dirname(output_filepath)
     if os.path.exists(audio_dir):
         for old_file in glob.glob(os.path.join(audio_dir, "*.mp3")):
@@ -102,12 +101,8 @@ def build_knowledge_base():
     portfolio = get_complete_portfolio()
     docs = []
     
-    birth_date = date(2005, 3, 18)
-    today = date.today()
-    dynamic_age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-    
     core = portfolio.get("profile_core", {})
-    intro_text = f"The Architect is {core.get('full_name', 'Md Salik Ubair')}, a {dynamic_age}-year-old elite AI Engineer. Current Designation: {core.get('professional_title')}. Engineering Summary: {core.get('profile_summary')}."
+    intro_text = f"The Architect is {core.get('full_name', 'Md Salik Ubair')}. Current Designation: {core.get('professional_title')}. Engineering Summary: {core.get('profile_summary')}."
     docs.append(Document(page_content=intro_text, metadata={"category": "intro"}))
     
     location = core.get("location", "Location Unassigned")
@@ -131,31 +126,45 @@ def build_knowledge_base():
     try:
         Chroma.from_documents(documents=docs, embedding=embeddings, persist_directory=vector_store_dir, client_settings=CHROMA_SETTINGS)
     except Exception as e:
-        print(f"Error vectorizing data: {e}")
+        logging.error(f"Error vectorizing data: {e}")
 
 def query_rag_brain(user_question):
+    # Dynamic Age Tracking (Calculated real-time, independent of DB)
+    birth_date = date(2005, 3, 18)
+    today = date.today()
+    dynamic_age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+    # Self-Healing DB Logic
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
     try:
         db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
-        # Upgraded k=20 to pull massive context for synthesis
         retrieved_docs = db.similarity_search(user_question, k=20) 
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
-        logging.error(f"Chroma Read Error: {e}")
-        context_text = "Vector database read error."
+        logging.warning(f"Chroma Read Error detected. Rebuilding DB instantly... {e}")
+        build_knowledge_base() # Rebuild instantly if corrupted
+        try:
+            db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
+            retrieved_docs = db.similarity_search(user_question, k=20) 
+            context_text = "\n".join([doc.page_content for doc in retrieved_docs])
+        except Exception as rebuild_e:
+            context_text = "Context temporarily unavailable. Stick strictly to identity details."
     
     prompt = f"""
     SYSTEM OVERRIDE: CORE IDENTITY, MULTILINGUAL INPUT, AND STRICT SYNTHESIS INITIALIZED.
-    Identity: The hyper-realistic Digital Twin of Md Salik Ubair, a top-tier AI Engineer.
+    
+    CRITICAL IDENTITY LOCK: 
+    You are the hyper-realistic Digital Twin of Md Salik Ubair. 
+    You are EXACTLY {dynamic_age} years old. Do not say your age is not in the database. You know your age.
 
     STRICT OPERATING PROTOCOLS:
-    1. ZERO ROBOTIC TRACES: Never use robotic filler ("How can I assist you?"). Speak naturally.
+    1. ZERO ROBOTIC TRACES: CRITICAL RULE - NEVER start a sentence with "Greetings", "Hello, I am the digital twin", "How can I assist you", or "I'm facing a bit of a challenge". Speak directly, confidently, and naturally like a human engineer.
     2. ADAPTIVE LANGUAGE: If the query is in English, respond in polished Corporate English. If the query is in Hinglish or Hindi, strictly respond in Hinglish.
     3. AUDIO-FIRST FORMATTING: NO markdown, NO bullet points, NO long URLs. Use short, punchy sentences.
-    4. MASTER SYNTHESIS: Read the 'INTERNAL MEMORY MATRIX'. Master the data. If asked about projects or experience, count them from the data and synthesize an answer. 
-    5. STRICT FACTUALITY: Only speak about what is explicitly listed in the memory matrix. Do not hallucinate numbers or stats. If the exact answer isn't there, focus on the quality of the uploaded documentation.
+    4. MASTER SYNTHESIS: Read the 'INTERNAL MEMORY MATRIX'. If asked about projects, count them from the data and answer confidently. 
+    5. NO HALLUCINATION: Only speak about what is explicitly listed in the memory matrix. If a detail is missing, confidently pivot to what you DO know without apologizing.
 
     INTERNAL MEMORY MATRIX:
     {context_text}
