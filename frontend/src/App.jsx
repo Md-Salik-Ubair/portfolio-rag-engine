@@ -33,6 +33,8 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]); 
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false); 
+  // Add Mobile Menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Upload, Edit & Modal States
   const [isUploadingDP, setIsUploadingDP] = useState(false);
@@ -211,7 +213,39 @@ function App() {
   };
 
   // ==========================================
-  // VIRTUAL PRESENCE ENGINE
+  // SMART UI: AUTO-SCROLL FUNCTION
+  // ==========================================
+  const handleSmartScroll = (text) => {
+      const lowerText = text.toLowerCase();
+      if(lowerText.includes('project') || lowerText.includes('projects')) {
+          const section = document.getElementById('section-projects');
+          if(section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setIsChatOpen(false); // Close chat to see the section on mobile
+          }
+      } else if (lowerText.includes('experience') || lowerText.includes('worked')) {
+          const section = document.getElementById('section-experiences');
+          if(section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setIsChatOpen(false);
+          }
+      } else if (lowerText.includes('education') || lowerText.includes('degree') || lowerText.includes('study')) {
+          const section = document.getElementById('section-education');
+          if(section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setIsChatOpen(false);
+          }
+      } else if (lowerText.includes('certification') || lowerText.includes('award')) {
+          const section = document.getElementById('section-certifications_and_achievements');
+          if(section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setIsChatOpen(false);
+          }
+      }
+  }
+
+  // ==========================================
+  // VIRTUAL PRESENCE ENGINE (WITH OVERLAP FIX & LOCKS)
   // ==========================================
   const isMuted = !isAudioEnabled;
 
@@ -232,8 +266,9 @@ function App() {
   }, [isMuted]);
 
   const startIntroSequence = () => {
+    stopAllAudio(); // Force stop before starting intro
     setAiState('intro');
-    const introText = "Greetings. I am the digital twin of Md Salik Ubair. How can I assist you in exploring his engineering portfolio?";
+    const introText = "I am the digital twin of Md Salik Ubair. I can answer questions about his engineering portfolio.";
     setChatHistory([{ role: 'ai', text: introText }]);
     
     if (!isMuted && speakingRef.current) {
@@ -253,6 +288,9 @@ function App() {
   };
 
   const playBackendStream = (data) => {
+    // FORCE STOP any playing audio before starting new response
+    stopAllAudio();
+
     const responseText = data.ai_response || "Connection established.";
     const audioUrl = data.audio_url;
     
@@ -276,12 +314,22 @@ function App() {
         audio.onended = () => {
             setAiState('idle');
             if (speakingRef.current) speakingRef.current.pause();
+            // Check if we need to smart scroll after speaking ends
+            handleSmartScroll(cleanSub);
         };
         
-        audio.onerror = () => setAiState('idle');
-        audio.play().catch(e => { console.error("Audio blocked:", e); setAiState('idle'); });
+        audio.onerror = () => {
+            setAiState('idle');
+            handleSmartScroll(cleanSub);
+        }
+        audio.play().catch(e => { 
+            console.error("Audio blocked:", e); 
+            setAiState('idle'); 
+            handleSmartScroll(cleanSub);
+        });
     } else {
         setAiState('idle');
+        handleSmartScroll(cleanSub);
     }
   };
 
@@ -294,6 +342,8 @@ function App() {
     setUserQuery('');
     
     setAiState('thinking');
+    
+    // FORCE STOP ANY EXISTING AUDIO/VIDEO BEFORE THINKING
     stopAllAudio(); 
 
     if (thinkingRef.current && !isMuted) {
@@ -316,93 +366,164 @@ function App() {
   const showSpeaking = ['intro', 'answering'].includes(aiState) && !isMuted;
   const showIdle = ['standby', 'idle', 'idle_waiting'].includes(aiState) || isMuted;
 
+  // Render Navbar Links
+  const navLinks = [
+    { label: 'About', view: 'portfolio', section: 'top' },
+    { label: 'Experience', view: 'portfolio', section: 'section-experiences' },
+    { label: 'Projects', view: 'portfolio', section: 'section-projects' },
+    { label: 'Education', view: 'portfolio', section: 'section-education' },
+    { label: 'Certifications', view: 'portfolio', section: 'section-certifications_and_achievements' },
+    { label: 'Admin Hub', view: 'admin-hub', section: null },
+  ];
+
+  const handleNavClick = (view, sectionId) => {
+      setCurrentView(view);
+      setIsMobileMenuOpen(false);
+      if(sectionId && view === 'portfolio') {
+          setTimeout(() => {
+              if(sectionId === 'top') {
+                  window.scrollTo({top: 0, behavior: 'smooth'});
+              } else {
+                  const element = document.getElementById(sectionId);
+                  if(element) element.scrollIntoView({behavior: 'smooth', block: 'start'});
+              }
+          }, 100);
+      }
+  }
+
   return (
-    <div className="min-h-screen bg-[#020202] text-slate-100 font-sans antialiased overflow-x-hidden relative selection:bg-sky-500/30">
+    <div className="min-h-screen bg-[#020202] text-slate-100 font-sans antialiased overflow-x-hidden relative selection:bg-sky-500/30 scroll-smooth">
       
       {/* Background Elements */}
       <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-sky-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
       <div className="fixed inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay"></div>
 
-      {/* NAVBAR */}
-      <nav className="fixed w-full border-b border-white/5 bg-black/50 backdrop-blur-2xl z-50 px-6 py-4 flex items-center justify-between">
-        <div>
-          <span className="font-extrabold text-lg tracking-widest text-white drop-shadow-[0_0_10px_rgba(14,165,233,0.8)]">
-            SALIK<span className="text-sky-500">.AI</span>
-          </span>
+      {/* 🚀 PREMIUM MSU MONOGRAM NAVBAR (Desktop & Mobile Handled) 🚀 */}
+      <nav className="fixed w-full border-b border-white/5 bg-black/50 backdrop-blur-2xl z-50 px-4 md:px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4 group cursor-pointer" onClick={() => handleNavClick('portfolio', 'top')}>
+          {/* Abstract Caligraphy M-S-U Symbol */}
+          <div className="relative flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-[#050505] border border-white/10 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(14,165,233,0.15)] group-hover:shadow-[0_0_25px_rgba(14,165,233,0.4)] group-hover:border-sky-500/30 transition-all duration-500">
+             <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-transparent"></div>
+             {/* The Interlocking Letters */}
+             <span className="relative font-serif font-black italic tracking-tighter text-lg md:text-xl flex select-none">
+                <span className="text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] z-20 translate-x-[2px]">M</span>
+                <span className="text-sky-500 -ml-1 mt-[2px] drop-shadow-[0_2px_10px_rgba(14,165,233,0.6)] z-30">S</span>
+                <span className="text-slate-400 -ml-[3px] flex items-end z-10 -mb-[1px]">U</span>
+             </span>
+          </div>
+          
+          {/* Brand Text */}
+          <div className="flex flex-col justify-center">
+            <span className="text-xs md:text-sm font-extrabold tracking-[0.2em] text-white leading-tight drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] uppercase">
+              Salik<span className="text-sky-400 font-light ml-1">Ubair</span>
+            </span>
+            <span className="text-[7px] md:text-[8px] text-slate-500 uppercase tracking-[0.3em] font-mono mt-0.5">
+              Intelligence Portfolio
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-4 md:gap-6">
-          <button onClick={() => setCurrentView('portfolio')} className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'portfolio' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>Portfolio</button>
-          <button onClick={() => setCurrentView('admin-hub')} className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${currentView === 'admin-hub' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]' : 'text-slate-500 hover:text-slate-300'}`}>Admin</button>
+
+        {/* Desktop Navigation */}
+        <div className="hidden lg:flex items-center gap-6">
+            {navLinks.map((link, idx) => (
+                <button 
+                    key={idx}
+                    onClick={() => handleNavClick(link.view, link.section)}
+                    className={`text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:text-sky-400`}
+                >
+                    {link.label}
+                </button>
+            ))}
+        </div>
+
+        {/* Mobile Hamburger Menu Toggle */}
+        <div className="lg:hidden flex items-center">
+             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2 text-xl border border-white/10 rounded-md">
+                 {isMobileMenuOpen ? '✕' : '☰'}
+             </button>
         </div>
       </nav>
+
+      {/* Mobile Dropdown Menu */}
+      {isMobileMenuOpen && (
+          <div className="fixed top-16 left-0 w-full bg-black/95 backdrop-blur-3xl border-b border-white/10 z-40 lg:hidden flex flex-col items-center py-4 space-y-4 animate-fadeIn">
+              {navLinks.map((link, idx) => (
+                  <button 
+                      key={idx}
+                      onClick={() => handleNavClick(link.view, link.section)}
+                      className="text-sm font-bold uppercase tracking-widest text-slate-300 hover:text-sky-400 w-full text-center py-2"
+                  >
+                      {link.label}
+                  </button>
+              ))}
+          </div>
+      )}
 
       {/* ========================================================= */}
       {/* 🚀 CINEMATIC MODAL POPUP FOR NODES (PREMIUM) 🚀 */}
       {/* ========================================================= */}
       {viewingNode && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-10 bg-black/90 backdrop-blur-2xl animate-fadeIn" onClick={() => setViewingNode(null)}>
-              <div className="bg-[#050505] border border-white/10 w-full h-full md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] md:rounded-3xl overflow-y-auto shadow-[0_0_100px_rgba(0,0,0,1)] relative scrollbar-hide" onClick={e => e.stopPropagation()}>
-                  
-                  {/* Close Button */}
-                  <button onClick={() => setViewingNode(null)} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-black/60 hover:bg-red-500 text-white rounded-full flex items-center justify-center border border-white/20 transition-colors z-50 font-bold backdrop-blur-xl">✕</button>
-                  
-                  {/* Cinematic Header Image */}
-                  <div className="w-full h-56 md:h-80 relative bg-black flex items-end">
-                      {viewingNode?.image_urls?.length > 0 && (
-                          <img src={viewingNode.image_urls[0]} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50 blur-[2px]" />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent z-10" />
-                      
-                      <div className="relative z-20 p-6 md:p-12 w-full translate-y-6">
-                          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
-                              <span className="bg-sky-500/20 text-sky-400 text-[10px] md:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-sky-500/30">{viewingNode._category?.replace(/_/g, ' ')}</span>
-                              <span className="text-xs md:text-sm font-mono text-slate-400 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">{viewingNode.duration_or_date}</span>
-                          </div>
-                          <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight drop-shadow-lg">{viewingNode.title}</h2>
-                          <p className="text-base md:text-xl text-indigo-300 font-medium mt-2">{viewingNode.organization_or_issuer}</p>
-                      </div>
-                  </div>
-                  
-                  <div className="p-6 md:p-12 pt-10 md:pt-16 space-y-6 md:space-y-8 relative z-20">
-                      {viewingNode.tag_or_skills_mapped && (
-                          <div className="flex flex-wrap gap-2">
-                              {viewingNode.tag_or_skills_mapped.split(',').map((skill, i) => (
-                                  <span key={i} className="bg-white/5 border border-white/10 text-slate-300 text-[10px] md:text-xs font-medium px-3 py-1.5 md:px-4 md:py-1.5 rounded-full">{skill.trim()}</span>
-                              ))}
-                          </div>
-                      )}
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-10 bg-black/90 backdrop-blur-2xl animate-fadeIn" onClick={() => setViewingNode(null)}>
+            <div className="bg-[#050505] border border-white/10 w-full h-full md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] md:rounded-3xl overflow-y-auto shadow-[0_0_100px_rgba(0,0,0,1)] relative scrollbar-hide" onClick={e => e.stopPropagation()}>
+                
+                {/* Close Button */}
+                <button onClick={() => setViewingNode(null)} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-black/60 hover:bg-red-500 text-white rounded-full flex items-center justify-center border border-white/20 transition-colors z-50 font-bold backdrop-blur-xl">✕</button>
+                
+                {/* Cinematic Header Image (DP Style) */}
+                <div className="w-full h-56 md:h-80 relative bg-black flex items-end">
+                    {viewingNode?.image_urls?.length > 0 && (
+                        <img src={viewingNode.image_urls[0]} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50 blur-[2px]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent z-10" />
+                    
+                    <div className="relative z-20 p-6 md:p-12 w-full translate-y-6">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                            <span className="bg-sky-500/20 text-sky-400 text-[10px] md:text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-sky-500/30">{viewingNode._category?.replace(/_/g, ' ')}</span>
+                            <span className="text-xs md:text-sm font-mono text-slate-400 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">{viewingNode.duration_or_date}</span>
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight drop-shadow-lg">{viewingNode.title}</h2>
+                        <p className="text-base md:text-xl text-indigo-300 font-medium mt-2">{viewingNode.organization_or_issuer}</p>
+                    </div>
+                </div>
+                
+                <div className="p-6 md:p-12 pt-10 md:pt-16 space-y-6 md:space-y-8 relative z-20">
+                    {viewingNode.tag_or_skills_mapped && (
+                        <div className="flex flex-wrap gap-2">
+                            {viewingNode.tag_or_skills_mapped.split(',').map((skill, i) => (
+                                <span key={i} className="bg-white/5 border border-white/10 text-slate-300 text-[10px] md:text-xs font-medium px-3 py-1.5 md:px-4 md:py-1.5 rounded-full">{skill.trim()}</span>
+                            ))}
+                        </div>
+                    )}
 
-                      <div className="prose prose-invert max-w-none text-slate-300 text-sm md:text-base leading-relaxed whitespace-pre-line">
-                          {viewingNode.description}
-                      </div>
+                    <div className="prose prose-invert max-w-none text-slate-300 text-sm md:text-base leading-relaxed whitespace-pre-line">
+                        {viewingNode.description}
+                    </div>
 
-                      {/* Render Hidden Readme if it exists */}
-                      {viewingNode.hidden_readme && (
-                          <div className="mt-8 p-5 md:p-6 bg-sky-900/10 border border-sky-500/20 rounded-2xl">
-                              <h4 className="text-sky-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-3 md:mb-4 flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></div>
-                                  Deep Tech Readme (AI Context)
-                              </h4>
-                              <p className="text-xs md:text-sm text-slate-400 font-mono whitespace-pre-line">{viewingNode.hidden_readme}</p>
-                          </div>
-                      )}
+                    {/* GALLERY / EXTRA IMAGES */}
+                    {viewingNode?.image_urls?.length > 1 && (
+                        <div className="mt-8 space-y-4">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Additional Assets / Certificates</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                {viewingNode.image_urls.slice(1).map((img, idx) => (
+                                    <a href={img} target="_blank" rel="noreferrer" key={idx} className="block aspect-video rounded-xl overflow-hidden border border-white/10 hover:border-sky-500 transition-colors">
+                                        <img src={img} alt="Certificate/Asset" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-                      <div className="flex flex-wrap gap-3 md:gap-4 pt-6 md:pt-8 border-t border-white/10">
-                          {viewingNode.smart_links?.map((link, idx) => (
-                              <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white text-black hover:bg-sky-400 text-xs md:text-sm font-bold px-5 py-2.5 md:px-6 md:py-3 rounded-xl transition-transform hover:-translate-y-1 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
-                                  {link.label} ↗
-                              </a>
-                          ))}
-                          {!viewingNode.smart_links?.length && viewingNode.external_redirection_link && (
-                              <a href={viewingNode.external_redirection_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white text-black hover:bg-sky-400 text-xs md:text-sm font-bold px-5 py-2.5 md:px-6 md:py-3 rounded-xl transition-transform hover:-translate-y-1 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
-                                  View Project ↗
-                              </a>
-                          )}
-                      </div>
-                  </div>
-              </div>
-          </div>
+                    <div className="flex flex-wrap gap-3 md:gap-4 pt-6 md:pt-8 border-t border-white/10">
+                        {viewingNode.smart_links?.map((link, idx) => (
+                            <a key={idx} href={link.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white text-black hover:bg-sky-400 text-xs md:text-sm font-bold px-5 py-2.5 md:px-6 md:py-3 rounded-xl transition-transform hover:-translate-y-1 shadow-[0_5px_15px_rgba(255,255,255,0.1)]">
+                                {link.label} ↗
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
       )}
 
       <main className="max-w-7xl mx-auto p-4 md:p-8 pt-24 md:pt-32 pb-32 relative z-10">
@@ -427,13 +548,13 @@ function App() {
                 
                 {/* Location Integration Restored */}
                 <div className="flex flex-col lg:flex-row items-center lg:items-start gap-2 text-base md:text-xl text-sky-400 font-medium tracking-wide lg:border-l-2 lg:border-indigo-500 lg:pl-4">
-                    <span>{backendData?.profile_core?.professional_title || "Update Title in Dashboard"}</span>
-                    {backendData?.profile_core?.location && (
-                        <div className="flex items-center gap-2">
-                            <span className="hidden lg:inline text-slate-500">•</span>
-                            <span className="text-slate-300 text-xs md:text-sm bg-white/5 lg:bg-transparent px-3 py-1 lg:px-0 lg:py-0 rounded-full">{backendData.profile_core.location}</span>
-                        </div>
-                    )}
+                  <span>{backendData?.profile_core?.professional_title || "Update Title in Dashboard"}</span>
+                  {backendData?.profile_core?.location && (
+                      <div className="flex items-center gap-2">
+                          <span className="hidden lg:inline text-slate-500">•</span>
+                          <span className="text-slate-300 text-xs md:text-sm bg-white/5 lg:bg-transparent px-3 py-1 lg:px-0 lg:py-0 rounded-full">{backendData.profile_core.location}</span>
+                      </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap justify-center lg:justify-start gap-3 text-xs md:text-sm mt-4">
@@ -449,14 +570,14 @@ function App() {
                     </a>
                   )}
 
-                  {/* FIXED: Instagram Component with Gradient */}
+                  {/* Instagram Component */}
                   {backendData?.social_channels?.instagram && (
                     <a href={backendData.social_channels.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg hover:opacity-90 transition-opacity font-bold shadow-[0_0_10px_rgba(236,72,153,0.3)]">
                         📸 Instagram
                     </a>
                   )}
 
-                  {backendData?.profile_core?.master_cv_url && <a href={backendData.profile_core.master_cv_url} target="_blank" rel="noreferrer" className="bg-sky-500 text-black font-bold px-3 py-2 md:px-4 md:py-2 rounded-lg hover:bg-sky-400 transition-colors shadow-[0_0_15px_rgba(14,165,233,0.3)]">📄 Download CV</a>}
+                  {backendData?.profile_core?.master_cv_url && <a href={backendData.profile_core.master_cv_url} target="_blank" rel="noreferrer" className="bg-sky-500 text-black font-bold px-3 py-2 md:px-4 md:py-2 rounded-lg hover:bg-sky-400 transition-colors shadow-[0_0_15px_rgba(14,165,233,0.3)]">📄 View Full Resume</a>}
                 </div>
 
                 {backendData?.profile_core?.profile_summary && (
@@ -474,36 +595,26 @@ function App() {
               </div>
             </div>
 
-            {/* SKILLS & LANGUAGES */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-4 md:space-y-6">
-                <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Technical Expertise</h3>
-                <div className="flex flex-wrap gap-2">
-                  {backendData?.profile_core?.skills_list ? (
-                    backendData.profile_core.skills_list.split(',').filter(s => s.trim() !== "").map((skill, index) => (
-                      <span key={index} className="bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[10px] md:text-xs font-medium px-3 py-1.5 md:px-4 md:py-1.5 rounded-full shadow-[0_0_10px_rgba(14,165,233,0.1)]">{skill.trim()}</span>
-                    ))
-                  ) : <span className="text-[10px] md:text-xs text-slate-600">No skills added yet.</span>}
-                </div>
-              </div>
-              <div className="md:col-span-1 border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-4 md:space-y-6">
-                <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Languages</h3>
-                <div className="flex flex-wrap gap-2">
-                  {backendData?.profile_core?.languages_known ? (
-                    backendData.profile_core.languages_known.split(',').filter(l => l.trim() !== "").map((lang, index) => (
-                      <span key={index} className="bg-white/5 border border-white/10 text-slate-300 text-[10px] md:text-xs px-3 py-1.5 md:px-4 md:py-1.5 rounded-full">{lang.trim()}</span>
-                    ))
-                  ) : <span className="text-[10px] md:text-xs text-slate-600">No languages added yet.</span>}
-                </div>
+            {/* SKILLS SECTION WITH BADGES */}
+            <div className="border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-6">
+              <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Core Technical Stack</h3>
+              <div className="flex flex-wrap gap-2">
+                {backendData?.profile_core?.skills_list ? (
+                  backendData.profile_core.skills_list.split(',').filter(s => s.trim() !== "").map((skill, index) => (
+                    <span key={index} className="bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs font-medium px-4 py-2 rounded-full shadow-[0_0_10px_rgba(14,165,233,0.1)] hover:bg-sky-500/20 transition-all cursor-default">
+                      {skill.trim()}
+                    </span>
+                  ))
+                ) : <span className="text-[10px] md:text-xs text-slate-600">No skills added yet.</span>}
               </div>
             </div>
 
-            {/* DYNAMIC LISTS RENDER (FIXED: MOBILE HORIZONTAL CAROUSEL) */}
+            {/* DYNAMIC LISTS RENDER */}
             {['experiences', 'projects', 'education', 'certifications_and_achievements'].map((sec) => {
               if (!backendData || !backendData[sec] || backendData[sec].length === 0) return null;
               const displayTitle = sec.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               return (
-                <div key={sec} className="space-y-4 md:space-y-6 relative w-full overflow-hidden">
+                <div key={sec} id={`section-${sec}`} className="space-y-4 md:space-y-6 relative w-full overflow-hidden scroll-mt-24">
                   <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-widest border-b border-white/10 pb-3 md:pb-4 flex items-center gap-3">
                      <div className="w-2 h-2 bg-sky-500 rounded-full" /> {displayTitle}
                   </h2>
@@ -519,9 +630,9 @@ function App() {
                         >
                           <div className="space-y-3 md:space-y-4 pointer-events-none">
                             {item.image_urls && item.image_urls.length > 0 && (
-                              <div className="w-full h-32 md:h-40 rounded-xl overflow-hidden mb-3 md:mb-4 border border-white/10 relative">
+                              <div className="w-full h-32 md:h-40 rounded-xl overflow-hidden mb-3 md:mb-4 border border-white/10 relative bg-[#050505]">
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
-                                  <img src={item.image_urls[0]} alt="Project Preview" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                  <img src={item.image_urls[0]} alt="Project Preview" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
                               </div>
                             )}
                             <div className="flex items-start justify-between gap-3 md:gap-4">
@@ -590,7 +701,6 @@ function App() {
                      </div>
                    ))}
                    
-                   {/* Instagram Admin Field added securely */}
                    <div className="space-y-1">
                        <label className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase">Instagram Link</label>
                        <input type="url" value={socialForm.instagram || ''} onChange={(e) => setSocialForm({...socialForm, instagram: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none transition-colors" />
@@ -598,7 +708,6 @@ function App() {
 
                    <textarea rows={4} value={profileForm.profile_summary || ''} onChange={(e) => setProfileForm({...profileForm, profile_summary: e.target.value})} placeholder="Professional Summary" className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-sky-500 outline-none resize-none transition-colors" />
                    
-                   {/* FIXED: Family Details Form Highlighted Box */}
                    <div className="p-3 md:p-4 bg-indigo-900/10 border border-indigo-500/30 rounded-xl space-y-3">
                        <h3 className="text-[9px] md:text-[10px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>Family & Private Narrative</h3>
                        <textarea rows={3} value={profileForm.family_narrative || ''} onChange={(e) => setProfileForm({...profileForm, family_narrative: e.target.value})} placeholder="Enter Family Details & Background Narrative here..." className="w-full bg-black border border-white/10 rounded-lg md:rounded-xl px-3 py-2 text-xs md:text-sm text-white focus:border-indigo-500 outline-none resize-none transition-colors" />
@@ -729,12 +838,12 @@ function App() {
       )}
 
       {/* ========================================================= */}
-      {/* 🚀 RESPONSIVE PREMIUM WIDGET (PC: Split View, Mobile: Fullscreen Modal) 🚀 */}
+      {/* 🚀 RESPONSIVE PREMIUM WIDGET (PC: Split View, Mobile: Fullscreen Fixed Top Avatar) 🚀 */}
       {/* ========================================================= */}
-      <div className={`fixed z-[200] transform transition-all duration-300 flex flex-col overflow-hidden bg-[#0a0a0a]/95 backdrop-blur-3xl 
+      <div className={`fixed z-[200] transform transition-all duration-300 flex flex-col bg-[#0a0a0a]/95 backdrop-blur-3xl 
           ${isChatOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 pointer-events-none translate-y-10'}
-          /* MOBILE: Fullscreen Absolute Cover */
-          inset-0 w-full h-full rounded-none
+          /* MOBILE: Fullscreen Fixed Layout */
+          inset-0 w-full h-full rounded-none overflow-hidden
           /* DESKTOP: Bottom Right Split Window */
           md:inset-auto md:bottom-10 md:right-10 md:w-[650px] md:h-[450px] md:border md:border-white/10 md:rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.9)]`}>
           
@@ -754,23 +863,19 @@ function App() {
               </div>
           </div>
           
-          {/* RESPONSIVE LAYOUT CONTAINER */}
-          <div className="flex flex-col md:flex-row flex-1 overflow-hidden h-[calc(100%-3rem)]">
+          {/* RESPONSIVE FLEX LAYOUT CONTAINER */}
+          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
               
-              {/* VIDEO AREA: Mobile = Top Block (Perfect Ratio, No cut head), Desktop = Left Sidebar */}
-              <div className="w-full h-[40vh] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0 flex items-center justify-center overflow-hidden">
+              {/* FIXED AVATAR AREA (Mobile: Top Fixed, Desktop: Left Side) */}
+              <div className="w-full h-[30vh] min-h-[220px] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0">
                   <video src={idleVideo} autoPlay loop muted playsInline className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-700 ${showIdle ? 'opacity-100' : 'opacity-0'}`} />
-                  
-                  {/* ADDED preload="none" TO FIX PAGESPEED PERFORMANCE SCORE */}
                   <video ref={thinkingRef} src={thinkingVideo} preload="none" loop={false} muted playsInline onEnded={handleThinkingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-500 ${showThinking ? 'opacity-100' : 'opacity-0'}`} />
                   <video ref={speakingRef} src={speakingVideo} preload="none" loop={aiState === 'answering'} muted={aiState === 'answering'} playsInline onEnded={handleSpeakingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-200 ${showSpeaking ? 'opacity-100' : 'opacity-0'}`} />
-                  
-                  {/* Premium Fade to mask harsh video edges on mobile */}
                   <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent pointer-events-none z-10" />
               </div>
 
-              {/* CHAT AREA */}
-              <div className="flex-1 flex flex-col h-full bg-[#050505]">
+              {/* CHAT INTERFACE AREA (Fully Scrollable) */}
+              <div className="flex-1 flex flex-col h-[calc(100vh-30vh-3rem)] md:h-full bg-[#050505]">
                   {/* Scrollable Log */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#050505]" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       {aiState === 'standby' && (
@@ -795,7 +900,7 @@ function App() {
                       <div ref={chatEndRef} />
                   </div>
 
-                  {/* Input Block */}
+                  {/* Input Block (Sticks to Bottom) */}
                   <div className="p-3 md:p-4 border-t border-white/10 bg-[#0a0a0a] flex-shrink-0">
                       {aiState === 'standby' ? (
                           <button onClick={startIntroSequence} className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold uppercase tracking-widest text-[11px] py-3.5 rounded-lg shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all">
