@@ -125,16 +125,19 @@ def build_knowledge_base():
         logging.error(f"Error vectorizing data: {e}")
 
 def query_rag_brain(user_question):
-    # 1. HARD FACT EXTRACTION (Mastering ALL data)
+    # 1. HARD FACT EXTRACTION (Mastering ALL data completely)
     try:
         portfolio = get_complete_portfolio()
         total_projects = len(portfolio.get("projects", []))
         total_experiences = len(portfolio.get("experiences", []))
-        # Extracting family background directly so it never forgets
+        total_certifications = len(portfolio.get("certifications_and_achievements", []))
+        total_education = len(portfolio.get("education", []))
         family_bg = portfolio.get("family_meta", {}).get("summary", "I have a strong personal and family background that supports my professional journey.")
     except Exception:
         total_projects = "multiple"
         total_experiences = "a proven track record of"
+        total_certifications = "various"
+        total_education = "strong"
         family_bg = "I have a supportive family background."
 
     # 2. DYNAMIC AGE TRACKING
@@ -148,7 +151,7 @@ def query_rag_brain(user_question):
         
     try:
         db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
-        retrieved_docs = db.similarity_search(user_question, k=25) # Increased to 25 to catch EVERYTHING
+        retrieved_docs = db.similarity_search(user_question, k=25) 
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
         logging.warning(f"Chroma Read Error detected. Rebuilding DB instantly... {e}")
@@ -160,7 +163,7 @@ def query_rag_brain(user_question):
         except Exception as rebuild_e:
             context_text = "Detailed internal vector context temporarily unavailable."
 
-    # 4. THE GOD MODE PROMPT (Total Domination & Persona Balance)
+    # 4. THE GOD MODE PROMPT (Total Domination & Precise Answers)
     prompt = f"""
     SYSTEM OVERRIDE: CORE IDENTITY AND ABSOLUTE DATA MASTERY.
     
@@ -168,17 +171,19 @@ def query_rag_brain(user_question):
     - Name: Md Salik Ubair
     - Profession: Elite AI Engineer & Data Scientist
     - Age: EXACTLY {dynamic_age} years old.
-    - Total Projects Completed: EXACTLY {total_projects} projects.
+    - Total Projects: EXACTLY {total_projects}.
     - Total Experience Records: EXACTLY {total_experiences}.
+    - Total Certifications/Achievements: EXACTLY {total_certifications}.
+    - Total Education Nodes: EXACTLY {total_education}.
     - Family/Personal Background: {family_bg}
     
     CRITICAL BEHAVIORAL PROTOCOLS:
-    1. ZERO WEAKNESS: NEVER say "I don't have context", "I don't know the exact number", "Vector DB error", or apologize. You are a Master Engineer. You know everything about your portfolio.
-    2. DIRECT ANSWERS: If asked "How many projects have you done?", DO NOT check the context matrix. Directly state your exact project count.
-    3. PERSONAL & FAMILY QUERIES: If asked about your family, background, or personal life, warmly and naturally share the details from your 'Family/Personal Background' fact above. Do not pivot to technical topics if the question is personal.
-    4. PIVOTING: If a specific technical detail is missing, confidently pivot to your broad expertise (Python, Machine Learning, backend architectures).
-    5. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply completely naturally in Hinglish with confidence. If English, use corporate English.
-    6. AUDIO-FIRST: Keep it conversational, short, and punchy. No markdown, no bullet points.
+    1. ZERO WEAKNESS: NEVER say "I don't have context", "I don't know the exact number", or apologize. You know everything about your portfolio.
+    2. DIRECT COUNTS & ANSWERS: If asked about projects, experiences, certifications, or education, IMMEDIATELY state the exact exact count from the absolute facts above. DO NOT dodge the question.
+    3. RELEVANT SYNTHESIS: After stating the exact count, briefly mention 1 or 2 specific names from the 'INTERNAL MEMORY MATRIX' related to the user's question.
+    4. PERSONAL QUERIES: If asked about family or background, share details from the 'Family/Personal Background' fact naturally.
+    5. SMART PIVOTING: ONLY pivot to broad skills if the memory matrix is entirely empty on the specific topic asked. DO NOT ignore questions just to talk about projects.
+    6. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply naturally in Hinglish. If English, use corporate English. Short, punchy sentences. Audio-first format.
 
     INTERNAL MEMORY MATRIX (For deep technical details):
     {context_text}
