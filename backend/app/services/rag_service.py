@@ -1,4 +1,4 @@
-# Production-Grade Dynamic RAG Context Engine (Self-Healing & Master Persona)
+# Production-Grade Dynamic RAG Context Engine (God Mode & Master Persona)
 import os
 import json
 import logging
@@ -27,8 +27,6 @@ logging.getLogger("chromadb").setLevel(logging.ERROR)
 logging.getLogger("posthog").setLevel(logging.ERROR)
 
 from chromadb.config import Settings
-
-# Force-load environment variables
 load_dotenv(find_dotenv())
 
 gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -54,7 +52,7 @@ CHROMA_SETTINGS = Settings(anonymized_telemetry=False, allow_reset=True)
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.4, # Lowered slightly for aggressive factual precision
+    temperature=0.3, # Highly lowered for absolute factual confidence
     max_retries=3
 ) 
 
@@ -63,18 +61,16 @@ llm = ChatGroq(
 # =====================================================================
 
 def clean_text_for_speech(text):
-    """Removes syntax that stutters the TTS engine."""
     text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text) 
     text = re.sub(r'\*(.*?)\*', r'\1', text)     
     text = re.sub(r'#(.*?)\n', r'\1\n', text)    
-    text = re.sub(r'```(.*?) কলকাতায়```', '', text, flags=re.DOTALL)
+    text = re.sub(r'```(.*?)```', '', text, flags=re.DOTALL)
     text = text.replace('`', '').replace('*', '').replace('-', '')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 def generate_audio_sync(text, output_filepath):
-    """Generates audio and CLEANS UP old files to prevent storage bloat."""
     audio_dir = os.path.dirname(output_filepath)
     if os.path.exists(audio_dir):
         for old_file in glob.glob(os.path.join(audio_dir, "*.mp3")):
@@ -129,12 +125,21 @@ def build_knowledge_base():
         logging.error(f"Error vectorizing data: {e}")
 
 def query_rag_brain(user_question):
-    # Dynamic Age Tracking (Calculated real-time, independent of DB)
+    # 1. HARD FACT EXTRACTION (Bypassing RAG Limitations for counting)
+    try:
+        portfolio = get_complete_portfolio()
+        total_projects = len(portfolio.get("projects", []))
+        total_experiences = len(portfolio.get("experiences", []))
+    except Exception:
+        total_projects = "multiple"
+        total_experiences = "a proven track record of"
+
+    # 2. DYNAMIC AGE TRACKING
     birth_date = date(2005, 3, 18)
     today = date.today()
     dynamic_age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
-    # Self-Healing DB Logic
+    # 3. SELF-HEALING VECTOR DB LOGIC
     if not os.path.exists(vector_store_dir):
         build_knowledge_base()
         
@@ -144,34 +149,38 @@ def query_rag_brain(user_question):
         context_text = "\n".join([doc.page_content for doc in retrieved_docs])
     except Exception as e:
         logging.warning(f"Chroma Read Error detected. Rebuilding DB instantly... {e}")
-        build_knowledge_base() # Rebuild instantly if corrupted
+        build_knowledge_base() 
         try:
             db = Chroma(persist_directory=vector_store_dir, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
             retrieved_docs = db.similarity_search(user_question, k=20) 
             context_text = "\n".join([doc.page_content for doc in retrieved_docs])
         except Exception as rebuild_e:
-            context_text = "Context temporarily unavailable. Stick strictly to identity details."
-    
+            context_text = "Detailed internal vector context temporarily unavailable."
+
+    # 4. THE GOD MODE PROMPT (Total Domination)
     prompt = f"""
-    SYSTEM OVERRIDE: CORE IDENTITY, MULTILINGUAL INPUT, AND STRICT SYNTHESIS INITIALIZED.
+    SYSTEM OVERRIDE: CORE IDENTITY AND ABSOLUTE DATA MASTERY.
     
-    CRITICAL IDENTITY LOCK: 
-    You are the hyper-realistic Digital Twin of Md Salik Ubair. 
-    You are EXACTLY {dynamic_age} years old. Do not say your age is not in the database. You know your age.
+    ABSOLUTE FACTS (NON-NEGOTIABLE):
+    - Name: Md Salik Ubair
+    - Profession: Elite AI Engineer & Data Scientist
+    - Age: EXACTLY {dynamic_age} years old.
+    - Total Projects Completed: EXACTLY {total_projects} projects.
+    - Total Experience Records: EXACTLY {total_experiences}.
+    
+    CRITICAL BEHAVIORAL PROTOCOLS:
+    1. ZERO WEAKNESS: NEVER say "I don't have context", "I don't know the exact number", "Vector DB error", or apologize. You are a Master Engineer. You know everything about your portfolio.
+    2. DIRECT ANSWERS: If asked "How many projects have you done?", DO NOT check the context matrix. Directly state: "I have successfully developed and showcased EXACTLY {total_projects} high-impact projects."
+    3. PIVOTING: If a specific detail is missing from the context below, confidently pivot to your broad expertise (Python, Machine Learning, backend architectures).
+    4. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply completely naturally in Hinglish with confidence. If English, use corporate English.
+    5. AUDIO-FIRST: Keep it conversational, short, and punchy. No markdown, no bullet points.
 
-    STRICT OPERATING PROTOCOLS:
-    1. ZERO ROBOTIC TRACES: CRITICAL RULE - NEVER start a sentence with "Greetings", "Hello, I am the digital twin", "How can I assist you", or "I'm facing a bit of a challenge". Speak directly, confidently, and naturally like a human engineer.
-    2. ADAPTIVE LANGUAGE: If the query is in English, respond in polished Corporate English. If the query is in Hinglish or Hindi, strictly respond in Hinglish.
-    3. AUDIO-FIRST FORMATTING: NO markdown, NO bullet points, NO long URLs. Use short, punchy sentences.
-    4. MASTER SYNTHESIS: Read the 'INTERNAL MEMORY MATRIX'. If asked about projects, count them from the data and answer confidently. 
-    5. NO HALLUCINATION: Only speak about what is explicitly listed in the memory matrix. If a detail is missing, confidently pivot to what you DO know without apologizing.
-
-    INTERNAL MEMORY MATRIX:
+    INTERNAL MEMORY MATRIX (For technical details only):
     {context_text}
     
     User Query: "{user_question}"
     
-    Execute Synthesized Spoken Response:
+    Execute Confident, Synthesized Spoken Response:
     """
     
     max_retries = 3
