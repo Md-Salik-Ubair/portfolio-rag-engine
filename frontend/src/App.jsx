@@ -59,7 +59,7 @@ function App() {
   const [tempLink, setTempLink] = useState({ label: '', url: '' });
 
   // ---------------------------------------------------------
-  // CORE EVENT LISTENERS (Back Button Hardware Fix & Scroll)
+  // CORE EVENT LISTENERS
   // ---------------------------------------------------------
   useEffect(() => {
     if (chatEndRef.current) {
@@ -67,7 +67,6 @@ function App() {
     }
   }, [chatHistory.length, aiState]);
 
-  // Fix hardware "Back" button closing the whole app when viewing a node
   useEffect(() => {
     const handlePopState = (e) => {
         if (viewingNode) {
@@ -235,35 +234,48 @@ function App() {
   };
 
   // ==========================================
-  // SMART UI: AUTO-SCROLL FUNCTION 
+  // SMART SKILL ICON MAPPER
+  // ==========================================
+  const getSkillIconUrl = (skillName) => {
+    const s = skillName.toLowerCase().trim();
+    const map = {
+        'react.js': 'react', 'react': 'react', 'reactjs': 'react',
+        'node.js': 'nodejs', 'nodejs': 'nodejs', 'node': 'nodejs',
+        'python': 'python', 'mongodb': 'mongodb', 'mongo': 'mongodb',
+        'flask': 'flask', 'git': 'git', 'github': 'github',
+        'numpy': 'numpy', 'pandas': 'pandas', 'tensorflow': 'tensorflow',
+        'scikit-learn': 'scikitlearn', 'sql': 'mysql', 'mysql': 'mysql',
+        'javascript': 'javascript', 'js': 'javascript', 'java': 'java',
+        'c++': 'cplusplus', 'c': 'c', 'html': 'html5', 'css': 'css3',
+        'docker': 'docker', 'aws': 'amazonwebservices', 'figma': 'figma',
+        'linux': 'linux', 'ubuntu': 'ubuntu', 'bash': 'bash', 'power bi': 'windows8'
+    };
+    const mapped = map[s] || s.replace(/[^a-z0-9]/g, '');
+    return `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/${mapped}/${mapped}-original.svg`;
+  };
+
+  // ==========================================
+  // SMART UI: AUTO-SCROLL FUNCTION
   // ==========================================
   const handleSmartScroll = (text) => {
       const lowerText = text.toLowerCase();
       if(lowerText.includes('project') || lowerText.includes('projects')) {
           const section = document.getElementById('section-projects');
-          if(section) {
-              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+          if(section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (lowerText.includes('experience') || lowerText.includes('worked')) {
           const section = document.getElementById('section-experiences');
-          if(section) {
-              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+          if(section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (lowerText.includes('education') || lowerText.includes('degree') || lowerText.includes('study')) {
           const section = document.getElementById('section-education');
-          if(section) {
-              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+          if(section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (lowerText.includes('certification') || lowerText.includes('award')) {
           const section = document.getElementById('section-certifications_and_achievements');
-          if(section) {
-              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+          if(section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
   }
 
   // ==========================================
-  // VIRTUAL PRESENCE ENGINE (Audio Flow Secured)
+  // VIRTUAL PRESENCE ENGINE 
   // ==========================================
   const isMuted = !isAudioEnabled;
 
@@ -288,6 +300,7 @@ function App() {
         if (nextState && aiState === 'answering' && speakingRef.current && speakingRef.current.paused) {
              speakingRef.current.play().catch(e => console.log("Video Play Blocked:", e));
         }
+
         return nextState;
     });
   };
@@ -435,10 +448,8 @@ function App() {
       {/* 🚀 PREMIUM MSU MONOGRAM NAVBAR 🚀 */}
       <nav className="fixed w-full border-b border-white/5 bg-black/50 backdrop-blur-2xl z-50 px-4 md:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4 group cursor-pointer" onClick={() => handleNavClick('portfolio', 'top')}>
-          {/* Abstract Caligraphy M-S-U Symbol */}
           <div className="relative flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-[#050505] border border-white/10 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(14,165,233,0.15)] group-hover:shadow-[0_0_25px_rgba(14,165,233,0.4)] group-hover:border-sky-500/30 transition-all duration-500">
              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-transparent"></div>
-             {/* The Interlocking Letters */}
              <span className="relative font-serif font-black italic tracking-tighter text-lg md:text-xl flex select-none">
                 <span className="text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] z-20 translate-x-[2px]">M</span>
                 <span className="text-sky-500 -ml-1 mt-[2px] drop-shadow-[0_2px_10px_rgba(14,165,233,0.6)] z-30">S</span>
@@ -446,7 +457,6 @@ function App() {
              </span>
           </div>
           
-          {/* Brand Text */}
           <div className="flex flex-col justify-center">
             <span className="text-xs md:text-sm font-extrabold tracking-[0.2em] text-white leading-tight drop-shadow-[0_0_8px_rgba(255,255,255,0.2)] uppercase">
               Salik<span className="text-sky-400 font-light ml-1">Ubair</span>
@@ -457,7 +467,6 @@ function App() {
           </div>
         </div>
 
-        {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center gap-6">
             {navLinks.map((link, idx) => (
                 <button 
@@ -470,7 +479,6 @@ function App() {
             ))}
         </div>
 
-        {/* Mobile Hamburger Menu Toggle */}
         <div className="lg:hidden flex items-center">
              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2 text-xl hover:text-sky-400 transition-colors">
                  {isMobileMenuOpen ? '✕' : '☰'}
@@ -478,7 +486,6 @@ function App() {
         </div>
       </nav>
 
-      {/* FIXED: Premium Mobile Dropdown Menu */}
       {isMobileMenuOpen && (
           <div className="fixed top-16 left-0 w-full bg-[#050505]/90 backdrop-blur-xl border-b border-white/10 z-40 lg:hidden flex flex-col p-4 space-y-2 shadow-2xl animate-fadeIn">
               {navLinks.map((link, idx) => (
@@ -494,16 +501,14 @@ function App() {
       )}
 
       {/* ========================================================= */}
-      {/* 🚀 CINEMATIC MODAL POPUP FOR NODES (PREMIUM) 🚀 */}
+      {/* 🚀 CINEMATIC MODAL POPUP FOR NODES 🚀 */}
       {/* ========================================================= */}
       {viewingNode && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-10 bg-black/90 backdrop-blur-2xl animate-fadeIn" onClick={() => setViewingNode(null)}>
             <div className="bg-[#050505] border border-white/10 w-full h-full md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] md:rounded-3xl overflow-y-auto shadow-[0_0_100px_rgba(0,0,0,1)] relative scrollbar-hide" onClick={e => e.stopPropagation()}>
                 
-                {/* Close Button */}
                 <button onClick={() => setViewingNode(null)} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-black/60 hover:bg-red-500 text-white rounded-full flex items-center justify-center border border-white/20 transition-colors z-50 font-bold backdrop-blur-xl">✕</button>
                 
-                {/* Cinematic Header Image (DP Style) */}
                 <div className="w-full h-56 md:h-80 relative bg-black flex items-end">
                     {viewingNode?.image_urls?.length > 0 && (
                         <img src={viewingNode.image_urls[0]} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-50 blur-[2px]" />
@@ -533,7 +538,6 @@ function App() {
                         {viewingNode.description}
                     </div>
 
-                    {/* GALLERY / EXTRA IMAGES */}
                     {viewingNode?.image_urls?.length > 1 && (
                         <div className="mt-8 space-y-4">
                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Additional Assets / Certificates</h4>
@@ -567,7 +571,6 @@ function App() {
           </div>
         ) : currentView === 'portfolio' ? (
           
-          /* ================= VIEW 1: PORTFOLIO ================= */
           <div className="space-y-12 md:space-y-16 animate-fadeIn">
             
             {/* HERO SECTION */}
@@ -624,14 +627,25 @@ function App() {
               </div>
             </div>
 
+            {/* 🚀 PREMIUM SMART SKILLS SECTION 🚀 */}
             <div className="border border-white/10 bg-white/[0.02] backdrop-blur-xl rounded-3xl p-6 md:p-8 space-y-6">
-              <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Core Technical Stack</h3>
-              <div className="flex flex-wrap gap-2">
+              <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest">Engineering Stack & Proficiencies</h3>
+              <div className="flex flex-wrap gap-3 md:gap-4">
                 {backendData?.profile_core?.skills_list ? (
                   backendData.profile_core.skills_list.split(',').filter(s => s.trim() !== "").map((skill, index) => (
-                    <span key={index} className="bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs font-medium px-4 py-2 rounded-full shadow-[0_0_10px_rgba(14,165,233,0.1)] hover:bg-sky-500/20 transition-all cursor-default">
+                    <div key={index} className="flex items-center gap-2 bg-black border border-white/10 text-slate-200 text-xs md:text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg hover:border-sky-500/50 hover:bg-white/[0.04] transition-all cursor-default group">
+                      <img 
+                          src={getSkillIconUrl(skill)} 
+                          alt="" 
+                          className="w-4 h-4 md:w-5 md:h-5 object-contain group-hover:scale-110 transition-transform"
+                          onError={(e) => {
+                              e.target.onerror = null; 
+                              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E";
+                              e.target.className = "w-2 h-2 opacity-50";
+                          }}
+                      />
                       {skill.trim()}
-                    </span>
+                    </div>
                   ))
                 ) : <span className="text-[10px] md:text-xs text-slate-600">No skills added yet.</span>}
               </div>
@@ -856,7 +870,7 @@ function App() {
       {!isChatOpen && currentView === 'portfolio' && (
          <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[100] flex items-center gap-3 md:gap-4 animate-fadeIn">
              <div className="flex bg-sky-500/10 border border-sky-500/30 text-sky-400 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold tracking-widest backdrop-blur-md shadow-[0_0_15px_rgba(14,165,233,0.3)] animate-pulse shadow-sky-500/20">
-                 Talk to AI Twin →
+                 Consult Digital Twin →
              </div>
              <button onClick={() => setIsChatOpen(true)} className="bg-sky-600 hover:bg-sky-500 text-white w-12 h-12 md:w-14 md:h-14 rounded-full shadow-[0_0_20px_rgba(14,165,233,0.5)] flex items-center justify-center transition-transform hover:scale-110 border border-white/20">
                  <span className="text-xl md:text-2xl">💬</span>
@@ -894,7 +908,6 @@ function App() {
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
               
               {/* FIXED AVATAR AREA (Mobile: Top Fixed, Desktop: Left Side) */}
-              {/* FIXED: Increased mobile height to 45vh and min-h to 300px for a prominent look */}
               <div className="w-full h-[45vh] min-h-[300px] md:w-[260px] md:h-full bg-black border-b md:border-b-0 md:border-r border-white/10 relative flex-shrink-0">
                   <video src={idleVideo} autoPlay loop muted playsInline className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-700 ${showIdle ? 'opacity-100' : 'opacity-0'}`} />
                   <video ref={thinkingRef} src={thinkingVideo} preload="none" loop={false} muted playsInline onEnded={handleThinkingEnded} className={`absolute w-full h-full object-cover object-top md:object-center transition-opacity duration-500 ${showThinking ? 'opacity-100' : 'opacity-0'}`} />
