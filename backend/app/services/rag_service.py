@@ -184,6 +184,8 @@ def query_rag_brain(user_question):
     4. PERSONAL QUERIES: If asked about family or background, share details from the 'Family/Personal Background' fact naturally.
     5. SMART PIVOTING: ONLY pivot to broad skills if the memory matrix is entirely empty on the specific topic asked. DO NOT ignore questions just to talk about projects.
     6. ADAPTIVE LANGUAGE: If asked in Hinglish/Hindi, reply naturally in Hinglish. If English, use corporate English. Short, punchy sentences. Audio-first format.
+    7. FACTUAL INTEGRITY: If retrieved context does not contain the answer, respond with "Data not available in portfolio" instead of inventing details.
+
 
     INTERNAL MEMORY MATRIX (For deep technical details):
     {context_text}
